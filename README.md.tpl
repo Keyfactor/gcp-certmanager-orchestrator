@@ -1,7 +1,7 @@
-# Palo Alto PA-VM Firewall
-## Orchestrator
+# {{ name }}
+## {{ integration_type | capitalize }}
 
-Palo Alto PA-VM Firewall Orchestrator for Add, Remove and Inventory.
+{{ description }}
 
 <!-- add integration specific information below -->
 *** 
@@ -85,6 +85,7 @@ Password |This is the API Key obtained from the Palo Alto PA-VM Firewall Device.
 `
 curl -k -X GET 'https://<firewall>/api/?type=keygen&user=<username>&password=<password>'
 `
+*** 
 
 #### Usage
 
@@ -92,17 +93,25 @@ curl -k -X GET 'https://<firewall>/api/?type=keygen&user=<username>&password=<pa
 
 ![](images/AddCertificate.gif)
 
+*** 
+
 **Adding New Certificate With Trusted Root**
 
 ![](images/AddWithTrustedRoot.gif)
+
+*** 
 
 **Replace Certficate**
 
 ![](images/ReplaceCertificate.gif)
 
+*** 
+
 **Remove Certficate**
 
 ![](images/RemoveCertificate.gif)
+
+*** 
 
 **Inventory Locations**
 

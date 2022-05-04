@@ -1,13 +1,13 @@
 ﻿{
   "extensions": {
     "Keyfactor.Orchestrators.Extensions.IOrchestratorJobExtension": {
-      "CertStores.IISBindings.Inventory": {
-        "assemblypath": "GcpCertificateManager.dll",
-        "TypeFullName": "Keyfactor.Extensions.Orchestrator.GcpCertificateManager.Jobs.Inventory"
+      "CertStores.GcpCertManager.Inventory": {
+        "assemblypath": "GcpCertManager.dll",
+        "TypeFullName": "Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs.Inventory"
       },
-      "CertStores.IISBindings.Management": {
-        "assemblypath": "GcpCertificateManager.dll",
-        "TypeFullName": "Keyfactor.Extensions.Orchestrator.GcpCertificateManager.Jobs.Management"
+      "CertStores.GcpCertManager.Management": {
+        "assemblypath": "GcpCertManager.dll",
+        "TypeFullName": "Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs.Management"
       }
     }
   }

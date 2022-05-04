@@ -24,7 +24,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
             _logger = logger;
         }
 
-        public string ExtensionName => "GcpCertificateManager";
+        public string ExtensionName => "GcpCertManager";
 
         public JobResult ProcessJob(InventoryJobConfiguration jobConfiguration,
             SubmitInventoryUpdate submitInventoryUpdate)
@@ -63,6 +63,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                         {
                             var certificatesRequest =
                                 svc.Projects.Locations.Certificates.List(storePath);
+                            certificatesRequest.Filter = "pemCertificate!=\"\"";
                             certificatesRequest.PageSize = 100;
                             if (nextPageToken?.Length > 0) certificatesRequest.PageToken = nextPageToken;
                             var certificatesResponse = certificatesRequest.Execute();

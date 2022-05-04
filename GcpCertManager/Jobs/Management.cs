@@ -35,7 +35,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
 
         protected internal virtual AsymmetricKeyEntry KeyEntry { get; set; }
 
-        public string ExtensionName => "GcpCertificateManager";
+        public string ExtensionName => "GcpCertManager";
 
         public JobResult ProcessJob(ManagementJobConfiguration jobConfiguration)
         {

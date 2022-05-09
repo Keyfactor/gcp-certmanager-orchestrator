@@ -56,7 +56,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                 //todo support labels and map entries by making api calls to search maps and map entries
 
                 if (storeProps != null)
-                    foreach (var location in storeProps.Locations.Split(','))
+                    foreach (var location in storeProps.Location.Split(','))
                     {
                         var storePath = $"projects/{config.CertificateStoreDetails.StorePath}/locations/{location}";
                         do
@@ -80,7 +80,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                                         _logger.LogTrace(
                                             $"Building Cert List Inventory Item Alias: {c.Name} Pem: {c.PemCertificate} Private Key: dummy (from PA API)");
                                         return BuildInventoryItem(c.Name, c.PemCertificate,
-                                            true,storePath); //todo figure out how to see if private key exists not in Google Api return
+                                            true,storePath,svc, storeProps.ProjectNumber); //todo figure out how to see if private key exists not in Google Api return
                                     }
                                     catch
                                     {
@@ -132,7 +132,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
 
         }
 
-        protected virtual CurrentInventoryItem BuildInventoryItem(string alias, string certPem, bool privateKey,string storePath)
+        protected virtual CurrentInventoryItem BuildInventoryItem(string alias, string certPem, bool privateKey,string storePath, CertificateManagerService svc,string projectNumber)
         {
             try
             {
@@ -140,11 +140,18 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                 _logger.LogTrace($"Alias: {alias} Pem: {certPem} PrivateKey: {privateKey}");
 
                 //1. Look up certificate map entries based on certificate name
-                var certAttributes = GetCertificateAttributes(storePath + "/certificates/" + alias);
+                var certAttributes = GetCertificateAttributes(storePath);
+                string modAlias = modAlias = alias.Split('/')[5];
+                var mapSettings = GetMapSettings(storePath, modAlias, svc, projectNumber);
+
+                if (mapSettings !=null && mapSettings.ContainsKey("Certificate Map Name") && mapSettings["Certificate Map Name"]?.ToString().Length > 0)
+                {
+                    modAlias = mapSettings["Certificate Map Name"] + "/" + mapSettings["Certificate Map Entry Name"] + "/" + modAlias;
+                }
 
                 var acsi = new CurrentInventoryItem
                 {
-                    Alias = alias,
+                    Alias = modAlias,
                     Certificates = new[] {certPem},
                     ItemStatus = OrchestratorInventoryItemStatus.Unknown,
                     PrivateKeyEntry = privateKey,
@@ -161,10 +168,47 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
             }
         }
 
-        protected new Dictionary<string, object> GetCertificateAttributes(string certificateName)
+        protected Dictionary<string, object> GetCertificateAttributes(string storePath)
         {
+            var locationName = storePath.Split('/')[3];
 
-            return new Dictionary<string, object>();
+            var siteSettingsDict = new Dictionary<string, object>
+                             {
+                                 { "Location", locationName}
+                             };
+            return siteSettingsDict;
+        }
+
+
+        protected Dictionary<string,string> GetMapSettings(string storePath,string certificateName, CertificateManagerService svc, string projectNumber)
+        {
+            var locationName = storePath.Split('/')[3];
+
+            var siteSettingsDict = new Dictionary<string, string>();
+
+            var certName = $"projects/{projectNumber}/locations/{locationName}/certificates/{certificateName}";
+
+            //Loop through list of maps and map entries until you find the certificate
+            var mapListRequest =
+                svc.Projects.Locations.CertificateMaps.List(storePath);
+            var mapListResponse = mapListRequest.Execute();
+
+            foreach (CertificateMap map in mapListResponse.CertificateMaps)
+            {
+                var mapEntryListRequest = svc.Projects.Locations.CertificateMaps.CertificateMapEntries.List(map.Name);
+                mapEntryListRequest.Filter = $"certificates:\"{certName}\"";
+                var mapEntryListResponse = mapEntryListRequest.Execute();
+
+                if (mapEntryListResponse?.CertificateMapEntries?.Count > 0)
+                {
+                    var mapEntry = mapEntryListResponse.CertificateMapEntries[0];
+                    siteSettingsDict.Add("Certificate Map Name", map.Name.Split('/')[5]);
+                    siteSettingsDict.Add("Certificate Map Entry Name", mapEntry.Name.Split('/')[7]);
+                    return siteSettingsDict;
+                }
+            }
+
+            return siteSettingsDict;
         }
     }
 }

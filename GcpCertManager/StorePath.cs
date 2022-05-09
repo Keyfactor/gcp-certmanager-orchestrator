@@ -6,16 +6,11 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager
     internal class StorePath
     {
 
-        [JsonProperty("Locations")]
+        [JsonProperty("Location")]
         [DefaultValue("global")]
-        public string Locations { get; set; }
-        [JsonProperty("Certificate Map Name")]
-        public string CertificateMapName { get; set; }
-        [JsonProperty("Certificate Map Entry Name")]
-        public string CertificateMapEntryName { get; set; }
-        [JsonProperty("Scope")]
-        public string Scope { get; set; }
-        
+        public string Location { get; set; }
+        [JsonProperty("Project Number")]
+        public string ProjectNumber { get; set; }
 
     }
 

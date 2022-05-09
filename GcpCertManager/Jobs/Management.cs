@@ -37,8 +37,15 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
 
         public string ExtensionName => "GcpCertManager";
 
+        protected internal string MapName { get; set; }
+
+        protected internal string MapEntryName { get; set; }
+
         public JobResult ProcessJob(ManagementJobConfiguration jobConfiguration)
         {
+            MapName = GetMapsettingsFromAlias(jobConfiguration.JobCertificate.Alias, "map");
+            MapEntryName = GetMapsettingsFromAlias(jobConfiguration.JobCertificate.Alias, "mapentry");
+
             return PerformManagement(jobConfiguration);
         }
 
@@ -122,8 +129,9 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
 
                 _logger.LogTrace(
                     $"Credentials JSON: Url: {config.CertificateStoreDetails.ClientMachine} Password: {config.ServerPassword}");
-
-                var location = config.JobProperties["Location"].ToString();
+                
+                StorePath storeProps = JsonConvert.DeserializeObject<StorePath>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
+                var location = storeProps.Location;
                 var storePath = $"projects/{config.CertificateStoreDetails.StorePath}/locations/{location}";
                 var client = new GcpCertificateManagerClient();
                 var svc = client.GetGoogleCredentials(config.CertificateStoreDetails.ClientMachine);
@@ -197,17 +205,20 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
 
                         _logger.LogTrace($"Got certPem {certPem}");
 
-                        //1. Check for Existing Map with the same name if matches the Entry Param then use it if not create new
-                        var mapName = config.JobProperties["Certificate Map Name"].ToString()?.ToLower();
-                        var mapCreated = CreateMap(mapName, svc, storePath);
-                        if (mapCreated == null)
-                            return new JobResult
-                            {
-                                Result = OrchestratorJobStatusJobResult.Failure,
-                                JobHistoryId = config.JobHistoryId,
-                                FailureMessage = $"Could not create the certificate map Named: {mapName}"
-                            };
-                        _logger.LogTrace($"Certificate Map Created with Name {mapCreated.Name}");
+
+
+                        if (MapName.Length > 0 && MapEntryName.Length > 0)
+                        {
+                            var mapCreated = CreateMap(MapName, svc, storePath);
+                            if (mapCreated == null)
+                                return new JobResult
+                                {
+                                    Result = OrchestratorJobStatusJobResult.Failure,
+                                    JobHistoryId = config.JobHistoryId,
+                                    FailureMessage = $"Could not create the certificate map Named: {MapName}"
+                                };
+                            _logger.LogTrace($"Certificate Map Created with Name {mapCreated.Name}");
+                        }
 
                         pubCertPem = $"-----BEGIN CERTIFICATE-----\r\n{pubCertPem}\r\n-----END CERTIFICATE-----";
 
@@ -218,7 +229,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                                 {PemCertificate = pubCertPem, PemPrivateKey = privateKeyString},
                             Name = config.JobCertificate.Alias?.ToLower(),
                             Description = config.JobCertificate?.Alias?.ToLower(),
-                            Scope = config.JobProperties["Scope"].ToString()
+                            Scope = "DEFAULT" //Scope does not come back in inventory so just hard code it for now
                         };
 
                         X509Certificate replaceCertificateResponse;
@@ -230,22 +241,24 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
 
                         _logger.LogTrace($"Certificate Created with SubjectDn {replaceCertificateResponse.SubjectDN}");
 
-                        //3. Get the host name to be passed into the create map call
-                        var subject = GetCommonNameFromSubject(replaceCertificateResponse.SubjectDN.ToString());
-
-
-                        var createCertificateMapEntryBody = new CertificateMapEntry
+                        if (MapName.Length > 0 && MapEntryName.Length > 0)
                         {
-                            Name = config.JobProperties["Certificate Map Entry Name"].ToString()?.ToLower(),
-                            Description = config.JobProperties["Certificate Map Entry Name"].ToString()?.ToLower(),
-                            Hostname = subject,
-                            Certificates = new List<string> {$"{storePath}/certificates/{gCertificate.Name}"}
-                        };
+                            //Get the host name to be passed into the create map call
+                            var subject = GetCommonNameFromSubject(replaceCertificateResponse.SubjectDN.ToString());
 
-                        //4. Check for Existing Map with the same name if matches the Entry Param then use it if not create new
-                        var mapEntryCreated = CreateMapEntry(createCertificateMapEntryBody, svc,
-                            storePath + "/certificateMaps/" + mapName);
-                        _logger.LogTrace($"Certificate Map Entry Created with Name {mapEntryCreated.Name}");
+                            var createCertificateMapEntryBody = new CertificateMapEntry
+                            {
+                                Name = MapEntryName,
+                                Description = MapEntryName,
+                                Hostname = subject,
+                                Certificates = new List<string> { $"{storePath}/certificates/{gCertificate.Name}" }
+                            };
+
+                            //4. Check for Existing Map with the same name if matches the Entry Param then use it if not create new
+                            var mapEntryCreated = CreateMapEntry(createCertificateMapEntryBody, svc,
+                            storePath + "/certificateMaps/" + MapName);
+                            _logger.LogTrace($"Certificate Map Entry Created with Name {mapEntryCreated.Name}");
+                        }
 
                         //5. Return success from job
                         return new JobResult
@@ -265,14 +278,24 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                         $"Duplicate alias {config.JobCertificate.Alias} found in Google Certificate Manager, to overwrite use the overwrite flag."
                 };
             }
+            catch (Google.GoogleApiException e)
+            {
+                var googleError = e.Error.ErrorResponseContent;
+                return new JobResult
+                {
+                    Result = OrchestratorJobStatusJobResult.Failure,
+                    JobHistoryId = config.JobHistoryId,
+                    FailureMessage =
+                        $"Management/Add {googleError}"
+                };
+            }
             catch (Exception e)
             {
                 return new JobResult
                 {
                     Result = OrchestratorJobStatusJobResult.Failure,
                     JobHistoryId = config.JobHistoryId,
-                    FailureMessage =
-                        $"Management/Add {LogHandler.FlattenException(e)}"
+                    FailureMessage = $"Management/Add {LogHandler.FlattenException(e)}"
                 };
             }
         }
@@ -316,20 +339,18 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
         {
             try
             {
-                var certificateMapName=config.JobProperties["Certificate Map Name"].ToString()?.ToLower();
-                var certificateMapEntryName = config.JobProperties["Certificate Map Entry Name"].ToString()?.ToLower();
 
                 //See if map entry exists, if so delete it
                 var certificateMapEntryListRequest =
-                    svc.Projects.Locations.CertificateMaps.CertificateMapEntries.List(storePath + $"/certificateMaps/{certificateMapName}");
-                certificateMapEntryListRequest.Filter = $"name=\"{storePath}/certificateMaps/{certificateMapName}/certificateMapEntries/{certificateMapEntryName}\"";
+                    svc.Projects.Locations.CertificateMaps.CertificateMapEntries.List(storePath + $"/certificateMaps/{MapName}");
+                certificateMapEntryListRequest.Filter = $"name=\"{storePath}/certificateMaps/{MapName}/certificateMapEntries/{MapEntryName}\"";
                 var certificateMapEntryListResponse = certificateMapEntryListRequest.Execute();
                 
                 if (certificateMapEntryListResponse?.CertificateMapEntries?.Count > 0)
                 {
                     var deleteCertificateMapEntryRequest =
                         svc.Projects.Locations.CertificateMaps.CertificateMapEntries.Delete(storePath +
-                            $"/certificateMaps/{config.JobProperties["Certificate Map Name"].ToString()?.ToLower()}/certificateMapEntries/{certificateMapEntryName}");
+                            $"/certificateMaps/{MapName}/certificateMapEntries/{MapEntryName}");
                     var deleteCertificateMapEntryResponse = deleteCertificateMapEntryRequest.Execute();
                     _logger.LogTrace(
                         $"Deleted {deleteCertificateMapEntryResponse.Name} Certificate Map Entry During Replace Procedure");
@@ -445,6 +466,21 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                     $"Error Checking for Duplicate Cert in Management.CheckForDuplicate {LogHandler.FlattenException(e)}");
                 throw;
             }
+        }
+
+        private string GetMapsettingsFromAlias(string alias,string nameType)
+        {
+            //alias should be in format MapName/MapEntryName/CertificateName
+            var aliasComponents = alias.Split('/');
+            if (aliasComponents.Length == 3 && nameType=="map")
+            {
+                return aliasComponents[1].ToLower();
+            }
+            if (aliasComponents.Length == 3 && nameType == "mapentry")
+            {
+                return aliasComponents[2].ToLower();
+            }
+            return "";
         }
 
         private string GetCommonNameFromSubject(string subject)

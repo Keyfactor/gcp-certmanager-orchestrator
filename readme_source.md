@@ -1,19 +1,3 @@
-# Google Cloud Provider Certificate Manager
-
-Google Certificate Manager Orchestrator for Add, Remove and Inventory.
-
-#### Integration status: Prototype - Demonstration quality. Not for use in customer environments.
-
-## About the Keyfactor Universal Orchestrator Capability
-
-This repository contains a Universal Orchestrator Capability which is a plugin to the Keyfactor Universal Orchestrator. Within the Keyfactor Platform, Orchestrators are used to manage “certificate stores” &mdash; collections of certificates and roots of trust that are found within and used by various applications.
-
-The Universal Orchestrator is part of the Keyfactor software distribution and is available via the Keyfactor customer portal. For general instructions on installing Capabilities, see the “Keyfactor Command Orchestrator Installation and Configuration Guide” section of the Keyfactor documentation. For configuration details of this specific Capability, see below in this readme.
-
-The Universal Orchestrator is the successor to the Windows Orchestrator. This Capability plugin only works with the Universal Orchestrator and does not work with the Windows Orchestrator.
-
----
-
 **Google Cloud Provider Certificate Manager**
 
 **Overview**
@@ -140,4 +124,3 @@ Password |This is not necessary.
 CASE NAME |Overwrite Flag|Alias Name|Expected Results|Actual Results
 ----------------|---------------
 New Cert with New Map and New Map Entry|False|map12/mentry12/cert12|New Map will be created, New Map Entry Created, New Cert Created|New Map will be created, New Map Entry Created, New Cert Created
-

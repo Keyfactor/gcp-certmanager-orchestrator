@@ -1,3 +1,5 @@
+**Google Cloud Provider Certificate Manager**
+
 **Overview**
 
 The GCP Certificate Manager Orchestrator remotely manages certificates on the Google Cloud Provider Certificate Manager Product.
@@ -95,10 +97,6 @@ Password |This is not necessary.
 
 *** 
 
-**Remove Certificate With Map Entry**
-
-*** 
-
 **Replace Certficate With Map Entry**
 
 ![](images/ReplaceCertificateMapEntry.gif)
@@ -109,16 +107,14 @@ Password |This is not necessary.
 
 ![](images/ReplaceCertificateNoMapEntry.gif)
 
+***
+
 **Remove Certificate No Map Entry**
 
-*** 
-
-**Replace Certficate With Map Entry**
-
-![](images/RemoveCertificateMapEntry.gif)
+![](images/RemoveCertifcateMapEntry.gif)
 
 *** 
 
-**Replace Certficate No Map Entry**
+**Remove Certficate No Map Entry**
 
 ![](images/RemoveCertificateNoMapEntry.gif)

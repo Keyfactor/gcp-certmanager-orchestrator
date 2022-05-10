@@ -2,6 +2,6 @@
     "$schema": "https://keyfactor.github.io/integration-manifest-schema.json",
     "integration_type": "orchestrator",
     "name": "Google Cloud Provider Certificate Manager",
-    "status": "Prototype",
+    "status": "prototype",
     "description": "Google Certificate Manager Orchestrator for Add, Remove and Inventory."
 }

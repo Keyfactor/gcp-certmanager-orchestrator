@@ -40,11 +40,11 @@ Entry Parameters|N/A| There are no Entry Parameters
 
 **Custom Fields:**
 
-![](images/CertStoreType-Custom Fields.gif)
+![](images/CertStoreType-CustomFields.gif)
 
 **Entry Params:**
 
-![](images/CertStoreType-Entry Parameters.gif)
+![](images/CertStoreType-EntryParameters.gif)
 
 **2. Register the GCP Certificate Manager Orchestrator with Keyfactor**
 See Keyfactor InstallingKeyfactorOrchestrators.pdf Documentation.  Get from your Keyfactor contact/representative.

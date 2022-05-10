@@ -56,11 +56,11 @@ Entry Parameters|N/A| There are no Entry Parameters
 
 **Custom Fields:**
 
-![](images/CertStoreType-Custom Fields.gif)
+![](images/CertStoreType-CustomFields.gif)
 
 **Entry Params:**
 
-![](images/CertStoreType-Entry Parameters.gif)
+![](images/CertStoreType-EntryParameters.gif)
 
 **2. Register the GCP Certificate Manager Orchestrator with Keyfactor**
 See Keyfactor InstallingKeyfactorOrchestrators.pdf Documentation.  Get from your Keyfactor contact/representative.
@@ -134,4 +134,10 @@ Password |This is not necessary.
 **Remove Certficate No Map Entry**
 
 ![](images/RemoveCertificateNoMapEntry.gif)
+
+
+#### TEST CASES
+CASE NAME |Overwrite Flag|Alias Name|Expected Results|Actual Results
+----------------|---------------
+New Cert with New Map and New Map Entry|False|map12/mentry12/cert12|New Map will be created, New Map Entry Created, New Cert Created|New Map will be created, New Map Entry Created, New Cert Created
 

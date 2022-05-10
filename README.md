@@ -2,7 +2,7 @@
 
 Google Certificate Manager Orchestrator for Add, Remove and Inventory.
 
-#### Integration status: 
+#### Integration status: Prototype - Demonstration quality. Not for use in customer environments.
 
 ## About the Keyfactor Universal Orchestrator Capability
 

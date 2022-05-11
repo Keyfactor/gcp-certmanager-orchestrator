@@ -41,11 +41,14 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
 
         protected internal string MapEntryName { get; set; }
 
+        protected internal string CertificateName { get; set; }
+
+
         public JobResult ProcessJob(ManagementJobConfiguration jobConfiguration)
         {
             MapName = GetMapsettingsFromAlias(jobConfiguration.JobCertificate.Alias, "map");
             MapEntryName = GetMapsettingsFromAlias(jobConfiguration.JobCertificate.Alias, "mapentry");
-
+            CertificateName = GetMapsettingsFromAlias(jobConfiguration.JobCertificate.Alias, "certificate");
             return PerformManagement(jobConfiguration);
         }
 
@@ -94,12 +97,13 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                 _logger.LogTrace(
                     $"Credentials JSON: Url: {config.CertificateStoreDetails.ClientMachine} Password: {config.ServerPassword}");
 
-                var location = config.JobProperties["Location"].ToString();
+                StorePath storeProps = JsonConvert.DeserializeObject<StorePath>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
+                var location = storeProps.Location;
                 var storePath = $"projects/{config.CertificateStoreDetails.StorePath}/locations/{location}";
                 var client = new GcpCertificateManagerClient();
                 var svc = client.GetGoogleCredentials(config.CertificateStoreDetails.ClientMachine);
 
-                DeleteCertificate(config, config.JobCertificate.Alias, svc, storePath);
+                DeleteCertificate(config, CertificateName, svc, storePath);
 
                 return new JobResult
                 {
@@ -139,7 +143,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                 _logger.LogTrace(
                     "Google Certificate Manager Client Created");
 
-                var duplicate = CheckForDuplicate(storePath, config.JobCertificate.Alias, svc);
+                var duplicate = CheckForDuplicate(storePath, CertificateName, svc);
                 _logger.LogTrace($"Duplicate? = {duplicate}");
 
                 //Check for Duplicate already in Google Certificate Manager, if there, make sure the Overwrite flag is checked before replacing
@@ -227,8 +231,8 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                         {
                             SelfManaged = new SelfManagedCertificate
                                 {PemCertificate = pubCertPem, PemPrivateKey = privateKeyString},
-                            Name = config.JobCertificate.Alias?.ToLower(),
-                            Description = config.JobCertificate?.Alias?.ToLower(),
+                            Name = CertificateName,
+                            Description = CertificateName,
                             Scope = "DEFAULT" //Scope does not come back in inventory so just hard code it for now
                         };
 
@@ -474,12 +478,21 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
             var aliasComponents = alias.Split('/');
             if (aliasComponents.Length == 3 && nameType=="map")
             {
-                return aliasComponents[1].ToLower();
+                return aliasComponents[0].ToLower();
             }
             if (aliasComponents.Length == 3 && nameType == "mapentry")
             {
+                return aliasComponents[1].ToLower();
+            }
+            if (aliasComponents.Length == 3 && nameType == "certificate")
+            {
                 return aliasComponents[2].ToLower();
             }
+            if (aliasComponents.Length == 1 && nameType == "certificate" && aliasComponents[0].Length>0)
+            {
+                return aliasComponents[0].ToLower();
+            }
+
             return "";
         }
 

@@ -121,7 +121,7 @@ Password |This is not necessary.
 
 ***
 
-**Remove Certificate No Map Entry**
+**Remove Certificate Map Entry**
 
 ![](images/RemoveCertifcateMapEntry.gif)
 

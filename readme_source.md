@@ -138,11 +138,11 @@ Case Number|Case Name|Case Description|Overwrite Flag|Alias Name|Expected Result
 1|Fresh Add with New Map and Entry|Will create new map, map entry and cert|False|map12/mentry12/cert12|New Map will be created, New Map Entry Created, New Cert Created|True
 1a|Try Replace without Overwrite|If user does not use overwrite flag, should error out on same entry replace|False|map12/mentry12/cert12|Error Occurs Saying to Use Overwrite Flag|True
 1b|Try Replace with Overwrite|Should  delete and re-insert mapentry and certificate|True|map12/mentry12/cert12|Replaced Cert Map Entry and Certificate|True
-2|Fresh Add with Cert Only (No Map)|Will create cert that is not tied to map|True|cert40|Created Certificate with alias cert40|True
+2|Fresh Add with Cert Only (No Map)|Will create cert that is not tied to map|False|cert40|Created Certificate with alias cert40|True
 2a|Try Replace without Overwrite|If user does not use overwrite flag, should error out on same entry replace|False|Cert40|Error Occurs Saying to Use Overwrite Flag|True
 2b|Try Replace with Overwrite|If user uses overwrite will replace cert|True|cert40|Certificate with be replaced with alias of cert40|True
 3|Fresh Add with new entry to existing map|Will create cert where entry is tied to an existing map|False|map12/mentry50/cert50|Created Certificate with alias map12/mentry50/cert50|True
 3a|Try Replace without Overwrite|If user does not use overwrite flag, should error out on same entry replace|False|map12/mentry50/cert50|Error Occurs Saying to Use Overwrite Flag|True
 4|Remove Cert In Map|Try to remove cert in existing map.  Should leave map and delete cert map entry and cert.|N/A|map12/mentry50/cert50|Cert cert50 and map entry mentry50 should be deleted.|True
-4a|Remove Standalone cert (No Map)|Try to remove cert without a map entry or map.|Cert cert40 should be deleted.|True
+4a|Remove Standalone cert (No Map)|Try to remove cert without a map entry or map.|N/A|cert40|Cert cert40 should be deleted.|True
 

@@ -9,7 +9,7 @@ This agent implements three job types – Inventory, Management Add, and Managem
 
 **Google Cloud Configuration**
 
-1. Read up on [Google Certificate Manager] (https://cloud.google.com/certificate-manager/docs) and how it works.
+1. Read up on [Google Certificate Manager](https://cloud.google.com/certificate-manager/docs) and how it works.
 2. A Google Service Account is needed with the following permissions (Note: Workload Identity Management Should be used but at the time of the writing it was not available in the .net library yet)
 ![](images/ServiceAccountSettings.gif)
 3. The following Api Access is needed:

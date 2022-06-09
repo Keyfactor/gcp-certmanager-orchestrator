@@ -18,7 +18,7 @@ The Universal Orchestrator is the successor to the Windows Orchestrator. This Ca
 
 **Overview**
 
-The GCP Certificate Manager Orchestrator remotely manages certificates on the Google Cloud Platform Certificate Manager Product.
+The GCP Certificate Manager Orchestrator remotely manages certificates on the Google Cloud Platform Certificate Manager Product
 
 This agent implements three job types – Inventory, Management Add, and Management Remove. Below are the steps necessary to configure this AnyAgent.  It supports adding certificates with or without private keys.
 

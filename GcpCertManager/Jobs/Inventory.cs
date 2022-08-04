@@ -49,14 +49,14 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                     $"Client Machine: {config.CertificateStoreDetails.ClientMachine} ApiKey: {config.ServerPassword}");
 
                 var storeProps = JsonConvert.DeserializeObject<StorePath>(config.CertificateStoreDetails.Properties,
-                    new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
+                    new JsonSerializerSettings {DefaultValueHandling = DefaultValueHandling.Populate});
 
                 _logger.LogTrace($"Store Properties: {JsonConvert.SerializeObject(storeProps)}");
 
                 var client = new GcpCertificateManagerClient();
                 _logger.LogTrace("Getting Credentials from Google...");
                 var svc = client.GetGoogleCredentials(config.CertificateStoreDetails.ClientMachine);
-                _logger.LogTrace($"Got Credentials from Google");
+                _logger.LogTrace("Got Credentials from Google");
 
 
                 var warningFlag = false;
@@ -180,7 +180,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                 var acsi = new CurrentInventoryItem
                 {
                     Alias = modAlias,
-                    Certificates = new[] { certPem },
+                    Certificates = new[] {certPem},
                     ItemStatus = OrchestratorInventoryItemStatus.Unknown,
                     PrivateKeyEntry = privateKey,
                     UseChainLevel = false,
@@ -215,7 +215,8 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
             }
             catch (Exception e)
             {
-                _logger.LogError($"Error Occurred in Inventory.GetCertificateAttributes: {LogHandler.FlattenException(e)}");
+                _logger.LogError(
+                    $"Error Occurred in Inventory.GetCertificateAttributes: {LogHandler.FlattenException(e)}");
                 throw;
             }
         }
@@ -242,10 +243,10 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                     $"mapListResponse: {JsonConvert.SerializeObject(mapListResponse)}");
 
                 if (mapListResponse?.CertificateMaps != null)
-                {
                     foreach (var map in mapListResponse.CertificateMaps)
                     {
-                        var mapEntryListRequest = svc.Projects.Locations.CertificateMaps.CertificateMapEntries.List(map.Name);
+                        var mapEntryListRequest =
+                            svc.Projects.Locations.CertificateMaps.CertificateMapEntries.List(map.Name);
                         mapEntryListRequest.Filter = $"certificates:\"{certName}\"";
                         var mapEntryListResponse = mapEntryListRequest.Execute();
                         _logger.LogTrace(
@@ -261,7 +262,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                             return siteSettingsDict;
                         }
                     }
-                }
+
                 _logger.MethodExit();
                 return siteSettingsDict;
             }

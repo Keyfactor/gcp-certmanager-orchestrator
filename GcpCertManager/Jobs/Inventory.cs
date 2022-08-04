@@ -56,7 +56,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                 var client = new GcpCertificateManagerClient();
                 _logger.LogTrace("Getting Credentials from Google...");
                 var svc = client.GetGoogleCredentials(config.CertificateStoreDetails.ClientMachine);
-                _logger.LogTrace($"Got Credentials from Google");
+                _logger.LogTrace("Got Credentials from Google");
 
 
                 var warningFlag = false;
@@ -84,31 +84,31 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
 
                             nextPageToken = null;
                             //Debug Write Certificate List Response from Google Cert Manager
-
-                            inventoryItems.AddRange(certificatesResponse.Certificates.Select(
-                                c =>
-                                {
-                                    try
+                            if (certificatesResponse?.Certificates != null)
+                                inventoryItems.AddRange(certificatesResponse.Certificates.Select(
+                                    c =>
                                     {
-                                        _logger.LogTrace(
-                                            $"Building Cert List Inventory Item Alias: {c.Name} Pem: {c.PemCertificate} Private Key: dummy (from PA API)");
-                                        return BuildInventoryItem(c.Name, c.PemCertificate,
-                                            true, storePath, svc,
-                                            storeProps
-                                                .ProjectNumber); //todo figure out how to see if private key exists not in Google Api return
-                                    }
-                                    catch
-                                    {
-                                        _logger.LogWarning(
-                                            $"Could not fetch the certificate: {c?.Name} associated with description {c?.Description}.");
-                                        sb.Append(
-                                            $"Could not fetch the certificate: {c?.Name} associated with issuer {c?.Description}.{Environment.NewLine}");
-                                        warningFlag = true;
-                                        return new CurrentInventoryItem();
-                                    }
-                                }).Where(acsii => acsii?.Certificates != null).ToList());
+                                        try
+                                        {
+                                            _logger.LogTrace(
+                                                $"Building Cert List Inventory Item Alias: {c.Name} Pem: {c.PemCertificate} Private Key: dummy (from PA API)");
+                                            return BuildInventoryItem(c.Name, c.PemCertificate,
+                                                true, storePath, svc,
+                                                storeProps
+                                                    .ProjectNumber); //todo figure out how to see if private key exists not in Google Api return
+                                        }
+                                        catch
+                                        {
+                                            _logger.LogWarning(
+                                                $"Could not fetch the certificate: {c?.Name} associated with description {c?.Description}.");
+                                            sb.Append(
+                                                $"Could not fetch the certificate: {c?.Name} associated with issuer {c?.Description}.{Environment.NewLine}");
+                                            warningFlag = true;
+                                            return new CurrentInventoryItem();
+                                        }
+                                    }).Where(acsii => acsii?.Certificates != null).ToList());
 
-                            if (certificatesResponse.NextPageToken?.Length > 0)
+                            if (certificatesResponse?.NextPageToken?.Length > 0)
                                 nextPageToken = certificatesResponse.NextPageToken;
                         } while (nextPageToken?.Length > 0);
                     }
@@ -215,7 +215,8 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
             }
             catch (Exception e)
             {
-                _logger.LogError($"Error Occurred in Inventory.GetCertificateAttributes: {LogHandler.FlattenException(e)}");
+                _logger.LogError(
+                    $"Error Occurred in Inventory.GetCertificateAttributes: {LogHandler.FlattenException(e)}");
                 throw;
             }
         }
@@ -241,25 +242,27 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                 _logger.LogTrace(
                     $"mapListResponse: {JsonConvert.SerializeObject(mapListResponse)}");
 
-
-                foreach (var map in mapListResponse.CertificateMaps)
-                {
-                    var mapEntryListRequest = svc.Projects.Locations.CertificateMaps.CertificateMapEntries.List(map.Name);
-                    mapEntryListRequest.Filter = $"certificates:\"{certName}\"";
-                    var mapEntryListResponse = mapEntryListRequest.Execute();
-                    _logger.LogTrace(
-                        $"mapEntryListResponse: {JsonConvert.SerializeObject(mapEntryListResponse)}");
-
-                    if (mapEntryListResponse?.CertificateMapEntries?.Count > 0)
+                if (mapListResponse?.CertificateMaps != null)
+                    foreach (var map in mapListResponse.CertificateMaps)
                     {
-                        var mapEntry = mapEntryListResponse.CertificateMapEntries[0];
-                        _logger.LogTrace($"mapEntry: {mapEntry}");
-                        siteSettingsDict.Add("Certificate Map Name", map.Name.Split('/')[5]);
-                        siteSettingsDict.Add("Certificate Map Entry Name", mapEntry.Name.Split('/')[7]);
-                        _logger.MethodExit();
-                        return siteSettingsDict;
+                        var mapEntryListRequest =
+                            svc.Projects.Locations.CertificateMaps.CertificateMapEntries.List(map.Name);
+                        mapEntryListRequest.Filter = $"certificates:\"{certName}\"";
+                        var mapEntryListResponse = mapEntryListRequest.Execute();
+                        _logger.LogTrace(
+                            $"mapEntryListResponse: {JsonConvert.SerializeObject(mapEntryListResponse)}");
+
+                        if (mapEntryListResponse?.CertificateMapEntries?.Count > 0)
+                        {
+                            var mapEntry = mapEntryListResponse.CertificateMapEntries[0];
+                            _logger.LogTrace($"mapEntry: {mapEntry}");
+                            siteSettingsDict.Add("Certificate Map Name", map.Name.Split('/')[5]);
+                            siteSettingsDict.Add("Certificate Map Entry Name", mapEntry.Name.Split('/')[7]);
+                            _logger.MethodExit();
+                            return siteSettingsDict;
+                        }
                     }
-                }
+
                 _logger.MethodExit();
                 return siteSettingsDict;
             }

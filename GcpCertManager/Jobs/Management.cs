@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -23,6 +24,9 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
     {
         private static readonly string certStart = "-----BEGIN CERTIFICATE-----\n";
         private static readonly string certEnd = "\n-----END CERTIFICATE-----";
+
+        private const int OPERATION_MAX_WAIT_MILLISECONDS = 300000;
+        private const int OPERATION_INTERVAL_WAIT_MILLISECONDS = 5000;
 
         private static readonly Func<string, string> Pemify = ss =>
             ss.Length <= 64 ? ss : ss.Substring(0, 64) + "\n" + Pemify(ss.Substring(64));
@@ -594,6 +598,33 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                     $"Error Checking for Duplicate Cert in Management.CheckForDuplicate {LogHandler.FlattenException(e)}");
                 throw;
             }
+        }
+
+        private void WaitForOperation(CertificateManagerService client, string operationName)
+        {
+            _logger.MethodEntry();
+
+            DateTime endTime = DateTime.Now.AddMilliseconds(OPERATION_MAX_WAIT_MILLISECONDS);
+            Operation operation = new Operation();
+            ProjectsResource.LocationsResource.OperationsResource.GetRequest getRequest = client.Projects.Locations.Operations.Get(operationName);
+
+            while (DateTime.Now < endTime)
+            {
+                _logger.LogTrace($"Attempting WAIT for {operationName} at {DateTime.Now.ToString()}.");
+                operation = getRequest.Execute();
+
+                if (operation.Done == true)
+                {
+                    _logger.LogDebug($"End WAIT for {operationName}. Task DONE.");
+                    _logger.MethodExit();
+                    return;
+                }
+
+                System.Threading.Thread.Sleep(OPERATION_INTERVAL_WAIT_MILLISECONDS);
+            }
+
+            _logger.MethodExit();
+            throw new Exception($"{operationName} was still processing after the {OPERATION_MAX_WAIT_MILLISECONDS.ToString()} millisecond maximum wait time.");
         }
 
         private string GetMapSettingsFromAlias(string alias, string nameType)

@@ -384,6 +384,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                 var replaceCertificateRequest = svc.Projects.Locations.Certificates.Create(gCertificate, storePath);
                 replaceCertificateRequest.CertificateId = gCertificate.Name;
                 var replaceCertificateResponse = replaceCertificateRequest.Execute();
+                WaitForOperation(svc, replaceCertificateResponse.Name);
 
                 _logger.LogTrace(
                     $"Certificate Created in Google Cert Manager with Name {replaceCertificateResponse.Name}");
@@ -435,6 +436,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                         var deleteCertificateMapEntryResponse = deleteCertificateMapEntryRequest.Execute();
                         _logger.LogTrace(
                             $"Delete Certificate Response Json {JsonConvert.SerializeObject(deleteCertificateMapEntryResponse)}");
+                        WaitForOperation(svc, deleteCertificateMapEntryResponse.Name);
 
                         _logger.LogTrace(
                             $"Deleted {deleteCertificateMapEntryResponse.Name} Certificate Map Entry During Replace Procedure");
@@ -453,6 +455,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                         svc.Projects.Locations.Certificates.Delete(storePath + $"/certificates/{certificateName}");
 
                     var deleteCertificateResponse = deleteCertificateRequest.Execute();
+                    WaitForOperation(svc, deleteCertificateResponse.Name);
                     _logger.LogTrace(
                         $"deleteCertificateResponse Json {JsonConvert.SerializeObject(deleteCertificateResponse)}");
 
@@ -493,6 +496,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                 certificateMapCreateRequest.CertificateMapId = mapName;
 
                 var certificateMapCreateResponse = certificateMapCreateRequest.Execute();
+                WaitForOperation(client, certificateMapCreateResponse.Name);
                 _logger.LogTrace(
                     $"certificateMapCreateResponse Json {JsonConvert.SerializeObject(certificateMapCreateResponse)}");
 
@@ -544,6 +548,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                 certificateMapEntryCreateRequest.CertificateMapEntryId = mapEntry.Name;
 
                 var certificateMapEntryCreateResponse = certificateMapEntryCreateRequest.Execute();
+                WaitForOperation(client, certificateMapEntryCreateResponse.Name);
                 _logger.LogTrace(
                     $"certificateMapEntryCreateResponse Json {JsonConvert.SerializeObject(certificateMapEntryCreateResponse)}");
 

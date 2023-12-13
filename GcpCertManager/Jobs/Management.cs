@@ -17,6 +17,7 @@ using Org.BouncyCastle.Crypto;
 using Org.BouncyCastle.OpenSsl;
 using Org.BouncyCastle.Pkcs;
 using Org.BouncyCastle.X509;
+using static Org.BouncyCastle.Math.EC.ECCurve;
 
 namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
 {
@@ -40,27 +41,21 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
 
         protected internal virtual AsymmetricKeyEntry KeyEntry { get; set; }
 
-        protected internal string MapName { get; set; }
-
-        protected internal string MapEntryName { get; set; }
-
         protected internal string CertificateName { get; set; }
 
-        public string ExtensionName => "GcpCertManager";
+        public string ExtensionName => "";
 
 
         public JobResult ProcessJob(ManagementJobConfiguration jobConfiguration)
         {
             try
             {
-                _logger.MethodEntry();
-                MapName = GetMapSettingsFromAlias(jobConfiguration.JobCertificate.Alias, "map");
-                _logger.LogTrace($"MapName: {MapName}");
-                MapEntryName = GetMapSettingsFromAlias(jobConfiguration.JobCertificate.Alias, "mapentry");
-                _logger.LogTrace($"MapEntryName: {MapEntryName}");
-                CertificateName = GetMapSettingsFromAlias(jobConfiguration.JobCertificate.Alias, "certificate");
-                _logger.LogTrace($"CertificateName: {CertificateName}");
-                _logger.MethodExit();
+                _logger.MethodEntry(LogLevel.Debug);
+
+                _logger.LogTrace("Getting Credentials from Google...");
+                var svc = string.IsNullOrEmpty(storeProperties.JsonKey) ? new CertificateManagerService() : new GcpCertificateManagerClient().GetGoogleCredentials(storeProperties.JsonKey);
+                _logger.LogTrace("Got Credentials from Google");
+
                 return PerformManagement(jobConfiguration);
             }
             catch (Exception e)
@@ -75,6 +70,16 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
             try
             {
                 _logger.MethodEntry();
+
+                StoreProperties storeProperties = JsonConvert.DeserializeObject<StoreProperties>(config.CertificateStoreDetails.Properties,
+                    new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
+
+                _logger.LogTrace($"Store Properties:");
+                _logger.LogTrace($"  Location: {storeProperties.Location}");
+                _logger.LogTrace($"  Project Id: {storeProperties.ProjectId}");
+                _logger.LogTrace($"  Project Number: {storeProperties.ProjectNumber}");
+                _logger.LogTrace($"  Service Account Json Key: {(string.IsNullOrEmpty(storeProperties.JsonKey) ? "Value exists" : "Value not present")}");
+
                 var complete = new JobResult
                 {
                     Result = OrchestratorJobStatusJobResult.Failure,
@@ -124,16 +129,13 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
             {
                 _logger.MethodEntry();
 
-                _logger.LogTrace(
-                    $"Credentials JSON: Url: {config.CertificateStoreDetails.ClientMachine} Password: {config.ServerPassword}");
-
                 var storeProps = JsonConvert.DeserializeObject<StorePath>(config.CertificateStoreDetails.Properties,
                     new JsonSerializerSettings {DefaultValueHandling = DefaultValueHandling.Populate});
                 _logger.LogTrace($"Store Properties: {JsonConvert.SerializeObject(storeProps)}");
                 if (storeProps != null)
                 {
                     var location = storeProps.Location;
-                    var storePath = $"projects/{config.CertificateStoreDetails.StorePath}/locations/{location}";
+                    var storePath = $"projects/{storeProperties.ProjectId}/locations/{location}";
                     var client = new GcpCertificateManagerClient();
                     _logger.LogTrace("Getting Credentials from Google...");
                     var svc = client.GetGoogleCredentials(config.CertificateStoreDetails.ClientMachine);
@@ -180,9 +182,6 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
             {
                 _logger.MethodEntry();
 
-                _logger.LogTrace(
-                    $"Credentials JSON: Url: {config.CertificateStoreDetails.ClientMachine} Password: {config.ServerPassword}");
-
                 var storeProps = JsonConvert.DeserializeObject<StorePath>(config.CertificateStoreDetails.Properties,
                     new JsonSerializerSettings {DefaultValueHandling = DefaultValueHandling.Populate});
                 _logger.LogTrace($"Store Properties: {JsonConvert.SerializeObject(storeProps)}");
@@ -190,7 +189,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                 if (storeProps != null)
                 {
                     var location = storeProps.Location;
-                    var storePath = $"projects/{config.CertificateStoreDetails.StorePath}/locations/{location}";
+                    var storePath = $"projects/{storeProperties.ProjectId}/locations/{location}";
                     var client = new GcpCertificateManagerClient();
                     _logger.LogTrace("Getting Credentials from Google...");
                     var svc = client.GetGoogleCredentials(config.CertificateStoreDetails.ClientMachine);
@@ -205,7 +204,6 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                         _logger.LogTrace("Either not a duplicate or overwrite was chosen....");
                         if (!string.IsNullOrWhiteSpace(config.JobCertificate.PrivateKeyPassword)) // This is a PFX Entry
                         {
-                            _logger.LogTrace($"Found Private Key {config.JobCertificate.PrivateKeyPassword}");
 
                             if (string.IsNullOrWhiteSpace(config.JobCertificate.Alias))
                                 _logger.LogTrace("No Alias Found");
@@ -241,14 +239,12 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                                     if (KeyEntry == null) throw new Exception("Unable to retrieve private key");
 
                                     var privateKey = KeyEntry.Key;
-                                    _logger.LogTrace($"privateKey = {privateKey}");
                                     var keyPair = new AsymmetricCipherKeyPair(publicKey, privateKey);
 
                                     pemWriter.WriteObject(keyPair.Private);
                                     streamWriter.Flush();
                                     privateKeyString = Encoding.ASCII.GetString(memoryStream.GetBuffer()).Trim()
                                         .Replace("\r", "").Replace("\0", "");
-                                    _logger.LogTrace($"Got Private Key String {privateKeyString}");
                                     memoryStream.Close();
                                     streamWriter.Close();
                                     _logger.LogTrace("Finished Extracting Private Key...");
@@ -379,10 +375,21 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                 //DEFAULT or EDGE_CACHE
                 //todo add labels 
                 //Path does not support cert and private key replacement so delete and insert instead
-                if (overwrite) DeleteCertificate(gCertificate.Name, svc, storePath);
 
-                var replaceCertificateRequest = svc.Projects.Locations.Certificates.Create(gCertificate, storePath);
-                replaceCertificateRequest.CertificateId = gCertificate.Name;
+
+
+
+                //if (overwrite) DeleteCertificate(gCertificate.Name, svc, storePath);
+
+                //var replaceCertificateRequest = svc.Projects.Locations.Certificates.Create(gCertificate, storePath);
+                //replaceCertificateRequest.CertificateId = gCertificate.Name;
+                var replaceCertificateRequest = svc.Projects.Locations.Certificates.Patch(gCertificate, storePath + $"/certificates/{CertificateName}");
+                replaceCertificateRequest.UpdateMask = "SelfManaged.PemCertificate,SelfManaged.PemPrivateKey";
+
+
+
+
+
                 var replaceCertificateResponse = replaceCertificateRequest.Execute();
                 WaitForOperation(svc, replaceCertificateResponse.Name);
 
@@ -432,7 +439,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                         var deleteCertificateMapEntryRequest =
                             svc.Projects.Locations.CertificateMaps.CertificateMapEntries.Delete(storePath +
                                 $"/certificateMaps/{MapName}/certificateMapEntries/{MapEntryName}");
-
+                        
                         var deleteCertificateMapEntryResponse = deleteCertificateMapEntryRequest.Execute();
                         _logger.LogTrace(
                             $"Delete Certificate Response Json {JsonConvert.SerializeObject(deleteCertificateMapEntryResponse)}");
@@ -455,9 +462,9 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                         svc.Projects.Locations.Certificates.Delete(storePath + $"/certificates/{certificateName}");
 
                     var deleteCertificateResponse = deleteCertificateRequest.Execute();
-                    WaitForOperation(svc, deleteCertificateResponse.Name);
                     _logger.LogTrace(
                         $"deleteCertificateResponse Json {JsonConvert.SerializeObject(deleteCertificateResponse)}");
+                    WaitForOperation(svc, deleteCertificateResponse.Name);
 
                     _logger.LogTrace($"Deleted {deleteCertificateResponse.Name} Certificate During Replace Procedure");
                 }
@@ -496,9 +503,9 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                 certificateMapCreateRequest.CertificateMapId = mapName;
 
                 var certificateMapCreateResponse = certificateMapCreateRequest.Execute();
-                WaitForOperation(client, certificateMapCreateResponse.Name);
                 _logger.LogTrace(
                     $"certificateMapCreateResponse Json {JsonConvert.SerializeObject(certificateMapCreateResponse)}");
+                WaitForOperation(client, certificateMapCreateResponse.Name);
 
                 if (certificateMapCreateResponse?.Name?.Length > 0)
                 {
@@ -548,9 +555,9 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                 certificateMapEntryCreateRequest.CertificateMapEntryId = mapEntry.Name;
 
                 var certificateMapEntryCreateResponse = certificateMapEntryCreateRequest.Execute();
-                WaitForOperation(client, certificateMapEntryCreateResponse.Name);
                 _logger.LogTrace(
                     $"certificateMapEntryCreateResponse Json {JsonConvert.SerializeObject(certificateMapEntryCreateResponse)}");
+                WaitForOperation(client, certificateMapEntryCreateResponse.Name);
 
                 if (certificateMapEntryCreateResponse?.Name?.Length > 0)
                 {

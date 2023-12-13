@@ -3,12 +3,15 @@ using Newtonsoft.Json;
 
 namespace Keyfactor.Extensions.Orchestrator.GcpCertManager
 {
-    internal class StorePath
+    internal class StoreProperties
     {
-        [JsonProperty("Location")]
         [DefaultValue("global")]
         public string Location { get; set; }
 
-        [JsonProperty("Project Number")] public string ProjectNumber { get; set; }
+        public string ProjectId { get; set; }
+
+        public string ProjectNumber { get; set; }
+
+        public string JsonKey { get; set; }
     }
 }

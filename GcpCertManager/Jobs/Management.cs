@@ -52,10 +52,6 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
             {
                 _logger.MethodEntry(LogLevel.Debug);
 
-                _logger.LogTrace("Getting Credentials from Google...");
-                var svc = string.IsNullOrEmpty(storeProperties.JsonKey) ? new CertificateManagerService() : new GcpCertificateManagerClient().GetGoogleCredentials(storeProperties.JsonKey);
-                _logger.LogTrace("Got Credentials from Google");
-
                 return PerformManagement(jobConfiguration);
             }
             catch (Exception e)
@@ -77,8 +73,13 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                 _logger.LogTrace($"Store Properties:");
                 _logger.LogTrace($"  Location: {storeProperties.Location}");
                 _logger.LogTrace($"  Project Id: {storeProperties.ProjectId}");
-                _logger.LogTrace($"  Project Number: {storeProperties.ProjectNumber}");
                 _logger.LogTrace($"  Service Account Json Key: {(string.IsNullOrEmpty(storeProperties.JsonKey) ? "Value exists" : "Value not present")}");
+
+                _logger.LogTrace("Getting Credentials from Google...");
+                var svc = string.IsNullOrEmpty(storeProperties.JsonKey) ? new CertificateManagerService() : new GcpCertificateManagerClient().GetGoogleCredentials(storeProperties.JsonKey);
+                _logger.LogTrace("Got Credentials from Google");
+
+                var storePath = $"projects/{storeProperties.ProjectId}/locations/{storeProperties.Location}";
 
                 var complete = new JobResult
                 {
@@ -88,17 +89,18 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                         "Invalid Management Operation"
                 };
 
-                if (config.OperationType.ToString() == "Add")
+                switch (config.OperationType)
                 {
-                    _logger.LogTrace("Adding...");
-                    _logger.LogTrace($"Add Config Json {JsonConvert.SerializeObject(config)}");
-                    complete = PerformAddition(config);
-                }
-                else if (config.OperationType.ToString() == "Remove")
-                {
-                    _logger.LogTrace("Removing...");
-                    _logger.LogTrace($"Remove Config Json {JsonConvert.SerializeObject(config)}");
-                    complete = PerformRemoval(config);
+                    case CertStoreOperationType.Add:
+                        _logger.LogTrace("Adding...");
+                        complete = PerformAddition(svc, config, storeProperties);
+                        break;
+                    case CertStoreOperationType.Remove:
+                        _logger.LogTrace("Removing...");
+                        complete = PerformRemoval(svc, config, storeProperties);
+                        break;
+                    default:
+                        return complete;
                 }
 
                 _logger.MethodExit();
@@ -123,26 +125,18 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
         }
 
 
-        private JobResult PerformRemoval(ManagementJobConfiguration config)
+        private JobResult PerformRemoval(CertificateManagerService svc, ManagementJobConfiguration config, StoreProperties storeProperties)
         {
             try
             {
                 _logger.MethodEntry();
 
-                var storeProps = JsonConvert.DeserializeObject<StorePath>(config.CertificateStoreDetails.Properties,
-                    new JsonSerializerSettings {DefaultValueHandling = DefaultValueHandling.Populate});
-                _logger.LogTrace($"Store Properties: {JsonConvert.SerializeObject(storeProps)}");
-                if (storeProps != null)
+                do
                 {
-                    var location = storeProps.Location;
-                    var storePath = $"projects/{storeProperties.ProjectId}/locations/{location}";
-                    var client = new GcpCertificateManagerClient();
-                    _logger.LogTrace("Getting Credentials from Google...");
-                    var svc = client.GetGoogleCredentials(config.CertificateStoreDetails.ClientMachine);
-                    _logger.LogTrace($"Got Credentials from Google");
-
-                    DeleteCertificate(CertificateName, svc, storePath);
+                    var certificateMapListRequest = svc.Projects.Locations.CertificateMaps.List(storeProperties.ProjectId + $"/certificateMaps/{MapName}");
                 }
+
+                DeleteCertificate(CertificateName, svc, storePath);
 
                 _logger.MethodExit();
                 return new JobResult
@@ -175,7 +169,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
         }
 
 
-        private JobResult PerformAddition(ManagementJobConfiguration config)
+        private JobResult PerformAddition(CertificateManagerService svc, ManagementJobConfiguration config, StoreProperties storeProperties)
         {
             //Temporarily only performing additions
             try

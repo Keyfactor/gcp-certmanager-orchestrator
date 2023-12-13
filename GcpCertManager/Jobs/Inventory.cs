@@ -51,7 +51,6 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                 _logger.LogTrace($"Store Properties:");
                 _logger.LogTrace($"  Location: {storeProperties.Location}"); 
                 _logger.LogTrace($"  Project Id: {storeProperties.ProjectId}");
-                _logger.LogTrace($"  Project Number: {storeProperties.ProjectNumber}");
                 _logger.LogTrace($"  Service Account Json Key: {(string.IsNullOrEmpty(storeProperties.JsonKey) ? "Value exists" : "Value not present")}");
 
                 _logger.LogTrace("Getting Credentials from Google...");
@@ -91,8 +90,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                                     _logger.LogTrace(
                                         $"Building Cert List Inventory Item Alias: {c.Name} Pem: {c.PemCertificate} Private Key: dummy (from PA API)");
                                     return BuildInventoryItem(c.Name, c.PemCertificate,
-                                        true, storePath, svc,
-                                        storeProperties.ProjectNumber);
+                                        true, storePath, svc);
                                 }
                                 catch
                                 {
@@ -151,7 +149,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
         }
 
         protected virtual CurrentInventoryItem BuildInventoryItem(string alias, string certPem, bool privateKey,
-            string storePath, CertificateManagerService svc, string projectNumber)
+            string storePath, CertificateManagerService svc)
         {
             try
             {

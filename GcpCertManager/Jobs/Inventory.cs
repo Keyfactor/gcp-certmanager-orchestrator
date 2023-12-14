@@ -47,14 +47,15 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
 
                 StoreProperties storeProperties = JsonConvert.DeserializeObject<StoreProperties>(config.CertificateStoreDetails.Properties,
                     new JsonSerializerSettings {DefaultValueHandling = DefaultValueHandling.Populate});
+                storeProperties.ProjectId = config.CertificateStoreDetails.ClientMachine;
 
                 _logger.LogTrace($"Store Properties:");
                 _logger.LogTrace($"  Location: {storeProperties.Location}"); 
                 _logger.LogTrace($"  Project Id: {storeProperties.ProjectId}");
-                _logger.LogTrace($"  Service Account Json Key: {(string.IsNullOrEmpty(storeProperties.JsonKey) ? "Value exists" : "Value not present")}");
+                _logger.LogTrace($"  Service Account Key Path: {storeProperties.ServiceAccountKey}");
 
                 _logger.LogTrace("Getting Credentials from Google...");
-                var svc = string.IsNullOrEmpty(storeProperties.JsonKey) ? new CertificateManagerService() : new GcpCertificateManagerClient().GetGoogleCredentials(storeProperties.JsonKey);
+                var svc = string.IsNullOrEmpty(storeProperties.ServiceAccountKey) ? new CertificateManagerService() : new GcpCertificateManagerClient().GetGoogleCredentials(storeProperties.ServiceAccountKey);
                 _logger.LogTrace("Got Credentials from Google");
 
                 var warningFlag = false;
@@ -65,7 +66,6 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
 
                 //todo support labels
                 var storePath = $"projects/{storeProperties.ProjectId}/locations/{storeProperties.Location}";
-
 
                 do
                 {
@@ -132,7 +132,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
             }
             catch (GoogleApiException e)
             {
-                var googleError = e.Error.ErrorResponseContent;
+                var googleError = e.Error?.ErrorResponseContent + " " + LogHandler.FlattenException(e);
                 return new JobResult
                 {
                     Result = OrchestratorJobStatusJobResult.Failure,

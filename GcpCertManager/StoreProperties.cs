@@ -10,6 +10,6 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager
 
         public string ProjectId { get; set; }
 
-        public string JsonKey { get; set; }
+        public string ServiceAccountKey { get; set; }
     }
 }

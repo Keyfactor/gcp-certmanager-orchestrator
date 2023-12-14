@@ -305,7 +305,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
 
         private void AddCertificate(Certificate gCertificate, CertificateManagerService svc, string storePath)
         {
-            var addCertificateRequest = svc.Projects.Locations.Certificates.Create(gCertificate, storePath + $"/certificates");
+            var addCertificateRequest = svc.Projects.Locations.Certificates.Create(gCertificate, storePath);
             addCertificateRequest.CertificateId = gCertificate.Name;
 
             var addCertificateResponse = addCertificateRequest.Execute();

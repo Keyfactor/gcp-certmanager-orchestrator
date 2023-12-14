@@ -247,7 +247,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                         var gCertificate = new Certificate
                         {
                             SelfManaged = new SelfManagedCertificate
-                                {PemCertificate = pubCertPem, PemPrivateKey = privateKeyString},
+                            { PemCertificate = pubCertPem, PemPrivateKey = privateKeyString },
                             Name = CertificateName,
                             Description = CertificateName,
                             Scope = "DEFAULT" //Scope does not come back in inventory so just hard code it for now
@@ -256,15 +256,12 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                         _logger.LogTrace(
                             $"Created Google Certificate Object: {JsonConvert.SerializeObject(gCertificate)}");
 
-                        X509Certificate replaceCertificateResponse;
                         if (duplicate && config.Overwrite)
-                            replaceCertificateResponse = ReplaceCertificate(gCertificate, svc, storePath, true);
+                            ReplaceCertificate(gCertificate, svc, storePath);
                         else
-                            replaceCertificateResponse =
-                                ReplaceCertificate(gCertificate, svc, storePath, false);
+                            AddCertificate(gCertificate, svc, storePath);
 
-                        _logger.LogTrace(
-                            $"Certificate Created with SubjectDn {replaceCertificateResponse.SubjectDN}");
+                        _logger.MethodExit();
 
                         //Return success from job
                         return new JobResult
@@ -275,14 +272,13 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                         };
                     }
                 }
-
                 _logger.MethodExit();
                 return new JobResult
                 {
                     Result = OrchestratorJobStatusJobResult.Failure,
                     JobHistoryId = config.JobHistoryId,
                     FailureMessage =
-                        $"Duplicate alias {config.JobCertificate.Alias} found in Google Certificate Manager, to overwrite use the overwrite flag."
+                        $"Duplicate alias {config.JobCertificate.Alias} found in Google Certificate Manager.  To overwrite use the overwrite flag."
                 };
             }
             catch (GoogleApiException e)
@@ -307,39 +303,32 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
             }
         }
 
-        private X509Certificate ReplaceCertificate(Certificate gCertificate,
-            CertificateManagerService svc, string storePath, bool overwrite)
+        private void AddCertificate(Certificate gCertificate, CertificateManagerService svc, string storePath)
+        {
+            var addCertificateRequest = svc.Projects.Locations.Certificates.Create(gCertificate, storePath + $"/certificates");
+            addCertificateRequest.CertificateId = gCertificate.Name;
+
+            var addCertificateResponse = addCertificateRequest.Execute();
+            WaitForOperation(svc, addCertificateResponse.Name);
+
+            _logger.LogTrace($"Certificate Created in Google Cert Manager with Name {addCertificateResponse.Name}");
+
+            _logger.MethodExit();
+        }
+
+        private void ReplaceCertificate(Certificate gCertificate, CertificateManagerService svc, string storePath)
         {
             _logger.MethodEntry();
 
-            //if (overwrite) DeleteCertificate(gCertificate.Name, svc, storePath);
-
-            //var replaceCertificateRequest = svc.Projects.Locations.Certificates.Create(gCertificate, storePath);
-            //replaceCertificateRequest.CertificateId = gCertificate.Name;
             var replaceCertificateRequest = svc.Projects.Locations.Certificates.Patch(gCertificate, storePath + $"/certificates/{CertificateName}");
             replaceCertificateRequest.UpdateMask = "SelfManaged";
-
-
-
-
 
             var replaceCertificateResponse = replaceCertificateRequest.Execute();
             WaitForOperation(svc, replaceCertificateResponse.Name);
 
-            _logger.LogTrace(
-                $"Certificate Created in Google Cert Manager with Name {replaceCertificateResponse.Name}");
-
-            var pemString = gCertificate.SelfManaged.PemCertificate;
-            pemString = pemString.Replace("-----BEGIN CERTIFICATE-----", "")
-                .Replace("-----END CERTIFICATE-----", "");
-            var buffer = Convert.FromBase64String(pemString);
-            var parser = new X509CertificateParser();
-            var cert = parser.ReadCertificate(buffer);
-
-            _logger.LogTrace($"X509 Serialized: {cert}");
+            _logger.LogTrace($"Certificate Replaced in Google Cert Manager with Name {replaceCertificateResponse.Name}");
 
             _logger.MethodExit();
-            return cert;
         }
 
         private void DeleteCertificate(string certificateName,

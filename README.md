@@ -123,14 +123,13 @@ See Keyfactor InstallingKeyfactorOrchestrators.pdf Documentation.  Get from your
 In Keyfactor Command create a new Certificate Store similar to the one below
 
 ![](images/CertStoreSettings.gif)
-![](images/GoogleCloudProjectInfo.gif)
 
 #### STORE CONFIGURATION 
 CONFIG ELEMENT	|DESCRIPTION
 ----------------|---------------
 Category	|The type of certificate store to be configured. Select category based on the display name configured above "GCP Certificate Manager".
 Container	|This is a logical grouping of like stores. This configuration is optional and does not impact the functionality of the store.
-Client Machine	|The name of the Google Certificate Manager Credentials File saved in the same directory as the GCP Certificate Manager Orchestrator Extension binaries.  Sample is "favorable-tree-346417-feb22d67de35.json".
+Client Machine	|Your GCP Project ID for your account.
 Store Path	|This is not used and should be defaulted to n/a per the certificate store type set up.
 Orchestrator	|This is the orchestrator server registered with the appropriate capabilities to manage this certificate store type. 
 Location|**global** is the default but could be another region based on the project.

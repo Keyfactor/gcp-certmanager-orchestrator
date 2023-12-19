@@ -1,4 +1,4 @@
-name: Starter Workflow
+name: Keyfactor Merge Cert Store Types
 on: [workflow_dispatch]
 
 jobs:

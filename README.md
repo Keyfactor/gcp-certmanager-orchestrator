@@ -4,38 +4,68 @@ Google Certificate Manager Orchestrator for Add, Remove and Inventory.
 
 #### Integration status: Pilot - Ready for use in test environments. Not for use in production.
 
-## About the Keyfactor Universal Orchestrator Capability
 
-This repository contains a Universal Orchestrator Capability which is a plugin to the Keyfactor Universal Orchestrator. Within the Keyfactor Platform, Orchestrators are used to manage “certificate stores” &mdash; collections of certificates and roots of trust that are found within and used by various applications.
+## About the Keyfactor Universal Orchestrator Extension
 
-The Universal Orchestrator is part of the Keyfactor software distribution and is available via the Keyfactor customer portal. For general instructions on installing Capabilities, see the “Keyfactor Command Orchestrator Installation and Configuration Guide” section of the Keyfactor documentation. For configuration details of this specific Capability, see below in this readme.
+This repository contains a Universal Orchestrator Extension which is a plugin to the Keyfactor Universal Orchestrator. Within the Keyfactor Platform, Orchestrators are used to manage “certificate stores” &mdash; collections of certificates and roots of trust that are found within and used by various applications.
 
-The Universal Orchestrator is the successor to the Windows Orchestrator. This Capability plugin only works with the Universal Orchestrator and does not work with the Windows Orchestrator.
+The Universal Orchestrator is part of the Keyfactor software distribution and is available via the Keyfactor customer portal. For general instructions on installing Extensions, see the “Keyfactor Command Orchestrator Installation and Configuration Guide” section of the Keyfactor documentation. For configuration details of this specific Extension see below in this readme.
+
+The Universal Orchestrator is the successor to the Windows Orchestrator. This Orchestrator Extension plugin only works with the Universal Orchestrator and does not work with the Windows Orchestrator.
+
+
+## Support for Google Cloud Provider Certificate Manager
+
+Google Cloud Provider Certificate Manager 
+
+###### To report a problem or suggest a new feature, use the **[Issues](../../issues)** tab. If you want to contribute actual bug fixes or proposed enhancements, use the **[Pull requests](../../pulls)** tab.
+
 
 ---
 
 
 
 
+## Keyfactor Version Supported
+
+The minimum version of the Keyfactor Universal Orchestrator Framework needed to run this version of the extension is 10.4.1
+
+## Platform Specific Notes
+
+The Keyfactor Universal Orchestrator may be installed on either Windows or Linux based platforms. The certificate operations supported by a capability may vary based what platform the capability is installed on. The table below indicates what capabilities are supported based on which platform the encompassing Universal Orchestrator is running.
+| Operation | Win | Linux |
+|-----|-----|------|
+|Supports Management Add|&check; |&check; |
+|Supports Management Remove|&check; |&check; |
+|Supports Create Store|  |  |
+|Supports Discovery|  |  |
+|Supports Renrollment|  |  |
+|Supports Inventory|&check; |&check; |
+
+
+
+
+
 ---
+
 
 **Google Cloud Platform Certificate Manager**
 
 **Overview**
 
-The GCP Certificate Manager Orchestrator remotely manages certificates on the Google Cloud Platform Certificate Manager Product
+The GCP Certificate Manager Orchestrator Extension remotely manages certificates on the Google Cloud Platform Certificate Manager Product
 
-This agent implements three job types – Inventory, Management Add, and Management Remove. Below are the steps necessary to configure this AnyAgent.  It supports adding certificates with or without private keys.
+This orchestrator extension implements three job types – Inventory, Management Add, and Management Remove. Below are the steps necessary to configure this Orchestrator Extension.  It supports adding certificates with or without private keys.
 
 
 **Google Cloud Configuration**
 
 1. Read up on [Google Certificate Manager](https://cloud.google.com/certificate-manager/docs) and how it works.
-2. A Google Service Account is needed with the following permissions (Note: Workload Identity Management Should be used but at the time of the writing it was not available in the .net library yet)
+2. Either a Google Service Account is needed with the following permissions (Note: Workload Identity Management Should be used but at the time of the writing it was not available in the .net library yet), or the virtual machine running the Keyfactor Orchestrator Service must reside within Google Cloud.
 ![](images/ServiceAccountSettings.gif)
 3. The following Api Access is needed:
 ![](images/ApiAccessNeeded.gif)
-4. Dowload the Json Credential file as shown below:
+4. If authenticating via service account, download the Json Credential file as shown below:
 ![](images/GoogleKeyJsonDownload.gif)
 
 **1. Create the New Certificate Store Type for the GCP Certificate Manager Orchestrator**
@@ -47,18 +77,19 @@ SETTING TAB  |  CONFIG ELEMENT	| DESCRIPTION
 ------|-----------|------------------
 Basic |Name	|Descriptive name for the Store Type.  Google Cloud Certificate Manager can be used.
 Basic |Short Name	|The short name that identifies the registered functionality of the orchestrator. Must be GcpCertMgr
-Basic |Custom Capability|Checked with Name GcpCertManager
+Basic |Custom Capability|Checked with Name GcpCertMgr
 Basic |Job Types	|Inventory, Add, and Remove are the supported job types. 
-Basic |Needs Server	|Must be checked
+Basic |Needs Server	|Unchecked
 Basic |Blueprint Allowed	|Unchecked
-Basic |Requires Store Password	|Determines if a store password is required when configuring an individual store.  This must be unchecked.
-Basic |Supports Entry Password	|Determined if an individual entry within a store can have a password.  This must be unchecked.
-Advanced |Store Path Type| Determines how the user will enter the store path when setting up the cert store.  Freeform
-Advanced |Supports Custom Alias	|Determines if an individual entry within a store can have a custom Alias.  This must be Required
-Advanced |Private Key Handling |Determines how the orchestrator deals with private keys.  Required
-Advanced |PFX Password Style |Determines password style for the PFX Password. Default
-Custom Fields|Google Cloud Platform Project Location|Name:Location Display Name:Location Type:String Default Value:global Required:True
-Custom Fields|Google Cloud Platform Project Number|Name:Project Number Display Name:Project Number Type:String Default Value:N/A Required:True
+Basic |Requires Store Password	|Unchecked.
+Basic |Supports Entry Password	|Unchecked.
+Advanced |Store Path Type| Fixed
+Advanced |Store Path Type Value (the textbox that shows when Store Path Type is set to "Fixed"	|n/a
+Advanced |Supports Custom Alias	|Required
+Advanced |Private Key Handling |Required
+Advanced |PFX Password Style |Default
+Custom Fields|Google Cloud Platform Project Location/Region|Name:Location, Display Name:Location, Type:String, Default Value:global, Required:False
+Custom Fields|The file name of the Google Cloud Service Account Key File installed in the same folder as the orchestrator extension.  Empty if the orchestrator server resides in GCP and you are not using a service account key |Name:Service Account Key File Name, Type:String, Default Value:, Required:True
 Entry Parameters|N/A| There are no Entry Parameters
 
 **Basic Settings:**
@@ -83,8 +114,7 @@ See Keyfactor InstallingKeyfactorOrchestrators.pdf Documentation.  Get from your
 **3. Create a GCP Certificate Manager Certificate Store within Keyfactor Command**
 In Keyfactor Command create a new Certificate Store similar to the one below
 
-![](images/CertStoreSettings-1.gif)
-![](images/CertStoreSettings-2.gif)
+![](images/CertStoreSettings.gif)
 ![](images/GoogleCloudProjectInfo.gif)
 
 #### STORE CONFIGURATION 
@@ -93,64 +123,14 @@ CONFIG ELEMENT	|DESCRIPTION
 Category	|The type of certificate store to be configured. Select category based on the display name configured above "GCP Certificate Manager".
 Container	|This is a logical grouping of like stores. This configuration is optional and does not impact the functionality of the store.
 Client Machine	|The name of the Google Certificate Manager Credentials File.  This file should be stored in the same directory as the Orchestrator binary.  Sample is "favorable-tree-346417-feb22d67de35.json".
-Store Path	|This will be the ProjectId of the Google Cloud Project.  Sample here is "favorable-tree-346417".  See above image.
-Location|global is the default but could be another region based on the project.
-Project Number| As shown in the above image, this can be obtained from the project information in Google Cloud.
+Store Path	|This is not used and should be defaulted to n/a per the certificate store type set up.
 Orchestrator	|This is the orchestrator server registered with the appropriate capabilities to manage this certificate store type. 
-Inventory Schedule	|The interval that the system will use to report on what certificates are currently in the store. 
+Location|**global** is the default but could be another region based on the project.
+Service Account Key File Name | The name of the file containing the GCP Service Account JSON formatted key previously downloaded.  Keep this optional field blank if the Keyfactor Orchestrator Service is running from an authenticated VM within Google Cloud.
+Update Server User Name |Click and select No Value.
+Update Server Password |Click and select No Value.
 Use SSL	|This should be checked.
-User	|This is not necessary.
-Password |This is not necessary.
-
-*** 
-
-#### Usage
-
-**Adding New Certificate No Map Entry**
-
-![](images/AddCertificateNoMapEntry.gif)
-
-*** 
-
-**Adding New Certificate With Map Entry**
-
-![](images/AddCertificateWithMapEntry.gif)
-
-*** 
-
-**Replace Certficate With Map Entry**
-
-![](images/ReplaceCertificateMapEntry.gif)
-
-*** 
-
-**Replace Certficate No Map Entry**
-
-![](images/ReplaceCertificateNoMapEntry.gif)
-
-*** 
-
-**Replace Certficate With Map Entry**
-
-![](images/ReplaceCertificateMapEntry.gif)
-
-*** 
-
-**Replace Certficate No Map Entry**
-
-![](images/ReplaceCertificateNoMapEntry.gif)
-
-***
-
-**Remove Certificate Map Entry**
-
-![](images/RemoveCertifcateMapEntry.gif)
-
-*** 
-
-**Remove Certficate No Map Entry**
-
-![](images/RemoveCertificateNoMapEntry.gif)
+Inventory Schedule	|The interval that the system will use to report on what certificates are currently in the store. 
 
 
 #### TEST CASES

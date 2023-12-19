@@ -3,6 +3,7 @@
   "integration_type": "orchestrator",
   "name": "Google Cloud Provider Certificate Manager",
   "status": "pilot",
+  "update_catalog": true,
   "description": "Google Certificate Manager Orchestrator for Add, Remove and Inventory.",
   "about": {
     "orchestrator": {

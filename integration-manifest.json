@@ -1,7 +1,78 @@
 {
-    "$schema": "https://keyfactor.github.io/integration-manifest-schema.json",
-    "integration_type": "orchestrator",
-    "name": "Google Cloud Provider Certificate Manager",
-    "status": "pilot",
-    "description": "Google Certificate Manager Orchestrator for Add, Remove and Inventory."
+  "$schema": "https://keyfactor.github.io/integration-manifest-schema.json",
+  "integration_type": "orchestrator",
+  "name": "Google Cloud Provider Certificate Manager",
+  "status": "pilot",
+  "update_catalog": false,
+  "release_dir": "GcpCertManager/bin/release",
+  "description": "Google Certificate Manager Orchestrator for Add, Remove and Inventory.",
+  "about": {
+    "orchestrator": {
+      "UOFramework": "10.4.1",
+      "pam_support": false,
+      "win": {
+        "supportsCreateStore": false,
+        "supportsDiscovery": false,
+        "supportsManagementAdd": true,
+        "supportsManagementRemove": true,
+        "supportsReenrollment": false,
+        "supportsInventory": true,
+        "platformSupport": "Unused"
+      },
+      "linux": {
+        "supportsCreateStore": false,
+        "supportsDiscovery": false,
+        "supportsManagementAdd": true,
+        "supportsManagementRemove": true,
+        "supportsReenrollment": false,
+        "supportsInventory": true,
+        "platformSupport": "Unused"
+      },
+      "store_types": {
+        "GcpCertMgr": {
+          "Name": "GCP Certificate Manager",
+          "ShortName": "GcpCertMgr",
+          "Capability": "GcpCertMgr",
+          "ServerRequired": false,
+          "BlueprintAllowed": false,
+          "CustomAliasAllowed": "Required",
+          "PowerShell": false,
+          "PrivateKeyAllowed": "Required",
+          "StorePathType": "",
+          "StorePathValue": "n/a",
+          "SupportedOperations": {
+            "Add": true,
+            "Create": true,
+            "Discovery": true,
+            "Enrollment": false,
+            "Remove": true
+          },
+          "PasswordOptions": {
+            "Style": "Default",
+            "EntrySupported": false,
+            "StoreRequired": false
+          },
+          "Properties": [
+            {
+              "Name": "Location",
+              "DisplayName": "Location",
+              "Type": "String",
+              "DependsOn": "",
+              "DefaultValue": "global",
+              "Required": true
+            },
+            {
+              "Name": "ServiceAccountKey",
+              "DisplayName": "Service Account Key File Path",
+              "Type": "String",
+              "DependsOn": "",
+              "DefaultValue": null,
+              "Required": false
+            }
+          ],
+          "EntryParameters": []
+        }
+      }
+    }
+  }
 }

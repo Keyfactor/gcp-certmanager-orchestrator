@@ -1,4 +1,4 @@
-**Google Cloud Platform Certificate Manager**
+## Google Cloud Platform Certificate Manager
 
 **Overview**
 
@@ -10,12 +10,18 @@ This orchestrator extension implements three job types – Inventory, Management
 **Google Cloud Configuration**
 
 1. Read up on [Google Certificate Manager](https://cloud.google.com/certificate-manager/docs) and how it works.
+
 2. Either a Google Service Account is needed with the following permissions (Note: Workload Identity Management Should be used but at the time of the writing it was not available in the .net library yet), or the virtual machine running the Keyfactor Orchestrator Service must reside within Google Cloud.
 ![](images/ServiceAccountSettings.gif)
+
 3. The following Api Access is needed:
 ![](images/ApiAccessNeeded.gif)
+
 4. If authenticating via service account, download the Json Credential file as shown below:
 ![](images/GoogleKeyJsonDownload.gif)
+
+
+## Keyfactor Command Configuration
 
 **1. Create the New Certificate Store Type for the GCP Certificate Manager Orchestrator**
 
@@ -24,21 +30,21 @@ In Keyfactor Command create a new Certificate Store Type similar to the one belo
 #### STORE TYPE CONFIGURATION
 SETTING TAB  |  CONFIG ELEMENT	| DESCRIPTION
 ------|-----------|------------------
-Basic |Name	|Descriptive name for the Store Type.  Google Cloud Certificate Manager can be used.
-Basic |Short Name	|The short name that identifies the registered functionality of the orchestrator. Must be GcpCertMgr
-Basic |Custom Capability|Checked with Name GcpCertMgr
-Basic |Job Types	|Inventory, Add, and Remove are the supported job types. 
+Basic |Name	|Descriptive name for the Store Type.  Example: Google Cloud Certificate Manager
+Basic |Short Name	|The name that identifies the registered functionality of the orchestrator. Must be GcpCertMgr
+Basic |Custom Capability|Unchecked
+Basic |Job Types	|Inventory, Add, and Remove are the supported job types
 Basic |Needs Server	|Unchecked
 Basic |Blueprint Allowed	|Unchecked
-Basic |Requires Store Password	|Unchecked.
-Basic |Supports Entry Password	|Unchecked.
+Basic |Requires Store Password	|Unchecked
+Basic |Supports Entry Password	|Unchecked
 Advanced |Store Path Type| Fixed
-Advanced |Store Path Type Value (the textbox that shows when Store Path Type is set to "Fixed"	|n/a
+Advanced |Store Path Type Value (the textbox that appears below Store Path Type when Store Path Type is set to "Fixed")	|n/a
 Advanced |Supports Custom Alias	|Required
 Advanced |Private Key Handling |Required
 Advanced |PFX Password Style |Default
 Custom Fields|Google Cloud Platform Project Location/Region|Name:Location, Display Name:Location, Type:String, Default Value:global, Required:False
-Custom Fields|The file name of the Google Cloud Service Account Key File installed in the same folder as the orchestrator extension.  Empty if the orchestrator server resides in GCP and you are not using a service account key |Name:Service Account Key File Name, Type:String, Default Value:, Required:True
+Custom Fields|The file name of the Google Cloud Service Account Key File installed in the same folder as the orchestrator extension.  Empty if the orchestrator server resides in GCP and you are not using a service account key |Name:Service Account Key File Name, Type:String, Default Value: (leave blank), Required:True
 Entry Parameters|N/A| There are no Entry Parameters
 
 **Basic Settings:**
@@ -52,6 +58,8 @@ Entry Parameters|N/A| There are no Entry Parameters
 **Custom Fields:**
 
 ![](images/CertStoreType-CustomFields.gif)
+![](images/CertStoreType-CustomFields-Location.gif)
+![](images/CertStoreType-CustomFields-ServiceAccountKey.gif)
 
 **Entry Params:**
 
@@ -71,7 +79,7 @@ CONFIG ELEMENT	|DESCRIPTION
 ----------------|---------------
 Category	|The type of certificate store to be configured. Select category based on the display name configured above "GCP Certificate Manager".
 Container	|This is a logical grouping of like stores. This configuration is optional and does not impact the functionality of the store.
-Client Machine	|The name of the Google Certificate Manager Credentials File.  This file should be stored in the same directory as the Orchestrator binary.  Sample is "favorable-tree-346417-feb22d67de35.json".
+Client Machine	|The name of the Google Certificate Manager Credentials File saved in the same directory as the GCP Certificate Manager Orchestrator Extension binaries.  Sample is "favorable-tree-346417-feb22d67de35.json".
 Store Path	|This is not used and should be defaulted to n/a per the certificate store type set up.
 Orchestrator	|This is the orchestrator server registered with the appropriate capabilities to manage this certificate store type. 
 Location|**global** is the default but could be another region based on the project.
@@ -81,18 +89,4 @@ Update Server Password |Click and select No Value.
 Use SSL	|This should be checked.
 Inventory Schedule	|The interval that the system will use to report on what certificates are currently in the store. 
 
-
-#### TEST CASES
-Case Number|Case Name|Case Description|Overwrite Flag|Alias Name|Expected Results|Passed
-------------|---------|----------------|--------------|----------|----------------|--------------
-1|Fresh Add with New Map and Entry|Will create new map, map entry and cert|False|map12/mentry12/cert12|New Map will be created, New Map Entry Created, New Cert Created|True
-1a|Try Replace without Overwrite|If user does not use overwrite flag, should error out on same entry replace|False|map12/mentry12/cert12|Error Occurs Saying to Use Overwrite Flag|True
-1b|Try Replace with Overwrite|Should  delete and re-insert mapentry and certificate|True|map12/mentry12/cert12|Replaced Cert Map Entry and Certificate|True
-2|Fresh Add with Cert Only (No Map)|Will create cert that is not tied to map|False|cert40|Created Certificate with alias cert40|True
-2a|Try Replace without Overwrite|If user does not use overwrite flag, should error out on same entry replace|False|Cert40|Error Occurs Saying to Use Overwrite Flag|True
-2b|Try Replace with Overwrite|If user uses overwrite will replace cert|True|cert40|Certificate with be replaced with alias of cert40|True
-3|Fresh Add with new entry to existing map|Will create cert where entry is tied to an existing map|False|map12/mentry50/cert50|Created Certificate with alias map12/mentry50/cert50|True
-3a|Try Replace without Overwrite|If user does not use overwrite flag, should error out on same entry replace|False|map12/mentry50/cert50|Error Occurs Saying to Use Overwrite Flag|True
-4|Remove Cert In Map|Try to remove cert in existing map.  Should leave map and delete cert map entry and cert.|N/A|map12/mentry50/cert50|Cert cert50 and map entry mentry50 should be deleted.|True
-4a|Remove Standalone cert (No Map)|Try to remove cert without a map entry or map.|N/A|cert40|Cert cert40 should be deleted.|True
 

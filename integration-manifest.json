@@ -4,11 +4,14 @@
   "name": "Google Cloud Provider Certificate Manager",
   "status": "production",
   "update_catalog": false,
+  "support_level": "kf-supported",
+  "link_github": true,
   "release_dir": "GcpCertManager/bin/release",
   "description": "Google Certificate Manager Orchestrator for Add, Remove and Inventory.",
   "about": {
     "orchestrator": {
       "UOFramework": "10.4.1",
+      "keyfactor_platform_version": "9.1.0",
       "pam_support": false,
       "win": {
         "supportsCreateStore": false,

@@ -1,2 +1,2 @@
 v1.0.2
-- Initial Version
+- Initial Public Version

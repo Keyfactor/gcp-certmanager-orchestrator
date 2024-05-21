@@ -55,7 +55,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                 _logger.LogTrace($"  Service Account Key Path: {storeProperties.ServiceAccountKey}");
 
                 _logger.LogTrace("Getting Credentials from Google...");
-                var svc = string.IsNullOrEmpty(storeProperties.ServiceAccountKey) ? new CertificateManagerService() : new GcpCertificateManagerClient().GetGoogleCredentials(storeProperties.ServiceAccountKey);
+                var svc = new GcpCertificateManagerClient().GetGoogleCredentials(storeProperties.ServiceAccountKey);
                 _logger.LogTrace("Got Credentials from Google");
 
                 var warningFlag = false;
@@ -133,6 +133,8 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
             catch (GoogleApiException e)
             {
                 var googleError = e.Error?.ErrorResponseContent + " " + LogHandler.FlattenException(e);
+
+                _logger.LogError($"PerformInventory Error: {LogHandler.FlattenException(e)}");
                 return new JobResult
                 {
                     Result = OrchestratorJobStatusJobResult.Failure,

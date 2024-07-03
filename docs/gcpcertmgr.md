@@ -97,8 +97,8 @@ The following table describes the required and optional fields for the `GcpCertM
 | --------- | ----------- | ------------------------- |
 | Category | Select "GCP Certificate Manager" or the customized certificate store name from the previous step. | |
 | Container | Optional container to associate certificate store with. | |
-| Client Machine | For the Client Machine field, enter your GCP Project ID associated with your Google Cloud account. For example, you can use 'my-gcp-project-id' as the value. | |
-| Store Path | For the Store Path field, enter 'n/a' as this field is not used for Certificate Stores of type 'GCP Certificate Manager'. | |
+| Client Machine | The Google Cloud Platform (GCP) Project ID associated with the user's account. Example: 'my-gcp-project-id'. | |
+| Store Path | The value 'n/a' should be used as the Store Path is not applicable for the GCP Certificate Manager Certificate Store type. | |
 | Orchestrator | Select an approved orchestrator capable of managing `GcpCertMgr` certificates. Specifically, one with the `GcpCertMgr` capability. | |
 
 * **Using kfutil**

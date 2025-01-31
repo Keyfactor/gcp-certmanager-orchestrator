@@ -121,7 +121,7 @@ To use the Google Cloud Provider Certificate Manager Universal Orchestrator exte
     | Name | Display Name | Description | Type | Default Value/Options | Required |
     | ---- | ------------ | ---- | --------------------- | -------- | ----------- |
     | Location | Location | **global** is the default but could be another region based on the project. | String | global | ✅ Checked |
-    | ServiceAccountKey | Service Account Key File Path | The tional field blank if the Keyfactor Orchestrator Service is running from an authenticated VM within Google Cloud. | String |  | 🔲 Unchecked |
+    | ServiceAccountKey | Service Account Key File Path | The file name of the Google Cloud Service Account Key File installed in the same folder as the orchestrator extension. Empty if the orchestrator server resides in GCP and you are not using a service account key. | String |  | 🔲 Unchecked |
 
     The Custom Fields tab should look like this:
 
@@ -199,7 +199,7 @@ To use the Google Cloud Provider Certificate Manager Universal Orchestrator exte
         | Store Path | This is not used and should be defaulted to n/a per the certificate store type set up. |
         | Orchestrator | Select an approved orchestrator capable of managing `GcpCertMgr` certificates. Specifically, one with the `GcpCertMgr` capability. |
         | Location | **global** is the default but could be another region based on the project. |
-        | ServiceAccountKey | The tional field blank if the Keyfactor Orchestrator Service is running from an authenticated VM within Google Cloud. |
+        | ServiceAccountKey | The file name of the Google Cloud Service Account Key File installed in the same folder as the orchestrator extension. Empty if the orchestrator server resides in GCP and you are not using a service account key. |
 
 
         
@@ -240,7 +240,7 @@ To use the Google Cloud Provider Certificate Manager Universal Orchestrator exte
         | Store Path | This is not used and should be defaulted to n/a per the certificate store type set up. |
         | Orchestrator | Select an approved orchestrator capable of managing `GcpCertMgr` certificates. Specifically, one with the `GcpCertMgr` capability. |
         | Location | **global** is the default but could be another region based on the project. |
-        | ServiceAccountKey | The tional field blank if the Keyfactor Orchestrator Service is running from an authenticated VM within Google Cloud. |
+        | ServiceAccountKey | The file name of the Google Cloud Service Account Key File installed in the same folder as the orchestrator extension. Empty if the orchestrator server resides in GCP and you are not using a service account key. |
 
 
         

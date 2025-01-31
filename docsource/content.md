@@ -12,10 +12,10 @@ This orchestrator extension implements three job types - Inventory, Management A
 1. Read up on [Google Certificate Manager](https://cloud.google.com/certificate-manager/docs) and how it works.
 
 2. Either a Google Service Account is needed with the following permissions (Note: Workload Identity Management Should be used but at the time of the writing it was not available in the .net library yet), or the virtual machine running the Keyfactor Orchestrator Service must reside within Google Cloud.
-![](images/ServiceAccountSettings.gif)
+![](docsource/images/ServiceAccountSettings.gif)
 
 3. The following Api Access is needed:
-![](images/ApiAccessNeeded.gif)
+![](docsource/images/ApiAccessNeeded.gif)
 
 4. If authenticating via service account, download the Json Credential file as shown below:
-![](images/GoogleKeyJsonDownload.gif)
+![](docsource/images/GoogleKeyJsonDownload.gif)

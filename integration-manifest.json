@@ -7,32 +7,15 @@
   "support_level": "kf-supported",
   "link_github": true,
   "release_dir": "GcpCertManager/bin/release",
+  "release_project": "GcpCertManager/GcpCertManager.csproj",
   "description": "Google Certificate Manager Orchestrator for Add, Remove and Inventory.",
   "about": {
     "orchestrator": {
       "UOFramework": "10.4.1",
       "keyfactor_platform_version": "9.1.0",
       "pam_support": false,
-      "win": {
-        "supportsCreateStore": false,
-        "supportsDiscovery": false,
-        "supportsManagementAdd": true,
-        "supportsManagementRemove": true,
-        "supportsReenrollment": false,
-        "supportsInventory": true,
-        "platformSupport": "Unused"
-      },
-      "linux": {
-        "supportsCreateStore": false,
-        "supportsDiscovery": false,
-        "supportsManagementAdd": true,
-        "supportsManagementRemove": true,
-        "supportsReenrollment": false,
-        "supportsInventory": true,
-        "platformSupport": "Unused"
-      },
-      "store_types": {
-        "GcpCertMgr": {
+      "store_types": [
+        {
           "Name": "GCP Certificate Manager",
           "ShortName": "GcpCertMgr",
           "Capability": "GcpCertMgr",
@@ -62,20 +45,28 @@
               "Type": "String",
               "DependsOn": "",
               "DefaultValue": "global",
-              "Required": true
+              "Required": true,
+              "IsPAMEligible": true,
+              "Description": "**global** is the default but could be another region based on the project."
+
             },
             {
               "Name": "ServiceAccountKey",
               "DisplayName": "Service Account Key File Path",
               "Type": "String",
               "DependsOn": "",
-              "DefaultValue": null,
-              "Required": false
+              "DefaultValue": "",
+              "Required": false,
+              "IsPAMEligible": false,
+              "Description": "The file name of the Google Cloud Service Account Key File installed in the same folder as the orchestrator extension. Empty if the orchestrator server resides in GCP and you are not using a service account key."
+
             }
           ],
+          "ClientMachineDescription": "GCP Project ID for your account.",
+          "StorePathDescription": "This is not used and should be defaulted to n/a per the certificate store type set up.",
           "EntryParameters": []
         }
-      }
+      ]
     }
   }
 }

@@ -19,4 +19,3 @@ This orchestrator extension implements three job types – Inventory, Management A
 
 4. If authenticating via service account, download the Json Credential file as shown below:
 ![](images/GoogleKeyJsonDownload.gif)
-

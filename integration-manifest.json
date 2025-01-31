@@ -46,8 +46,8 @@
               "DependsOn": "",
               "DefaultValue": "global",
               "Required": true,
-              "IsPAMEligible": true,
-              "Description": "**global** is the default but could be another region based on the project."
+              "IsPAMEligible": false,
+              "Description": "The GCP region used for this Certificate Manager instance.  **global** is the default but could be another region based on the project."
 
             },
             {

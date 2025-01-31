@@ -58,7 +58,7 @@
               "DefaultValue": "",
               "Required": false,
               "IsPAMEligible": false,
-              "Description": "The tional field blank if the Keyfactor Orchestrator Service is running from an authenticated VM within Google Cloud."
+              "Description": "The file name of the Google Cloud Service Account Key File installed in the same folder as the orchestrator extension. Empty if the orchestrator server resides in GCP and you are not using a service account key."
 
             }
           ],

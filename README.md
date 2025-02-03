@@ -120,7 +120,7 @@ To use the Google Cloud Provider Certificate Manager Universal Orchestrator exte
 
     | Name | Display Name | Description | Type | Default Value/Options | Required |
     | ---- | ------------ | ---- | --------------------- | -------- | ----------- |
-    | Location | Location | **global** is the default but could be another region based on the project. | String | global | ✅ Checked |
+    | Location | Location | The GCP region used for this Certificate Manager instance.  **global** is the default but could be another region based on the project. | String | global | ✅ Checked |
     | ServiceAccountKey | Service Account Key File Path | The file name of the Google Cloud Service Account Key File installed in the same folder as the orchestrator extension. Empty if the orchestrator server resides in GCP and you are not using a service account key. | String |  | 🔲 Unchecked |
 
     The Custom Fields tab should look like this:
@@ -165,12 +165,6 @@ To use the Google Cloud Provider Certificate Manager Universal Orchestrator exte
     Refer to [Starting/Restarting the Universal Orchestrator service](https://software.keyfactor.com/Core-OnPrem/Current/Content/InstallingAgents/NetCoreOrchestrator/StarttheService.htm).
 
 
-6. **(optional) PAM Integration** 
-
-    The Google Cloud Provider Certificate Manager Universal Orchestrator extension is compatible with all supported Keyfactor PAM extensions to resolve PAM-eligible secrets. PAM extensions running on Universal Orchestrators enable secure retrieval of secrets from a connected PAM provider.
-
-    To configure a PAM provider, [reference the Keyfactor Integration Catalog](https://keyfactor.github.io/integrations-catalog/content/pam) to select an extension, and follow the associated instructions to install it on the Universal Orchestrator (remote).
-
 
 > The above installation steps can be supplimented by the [official Command documentation](https://software.keyfactor.com/Core-OnPrem/Current/Content/InstallingAgents/NetCoreOrchestrator/CustomExtensions.htm?Highlight=extensions).
 
@@ -198,24 +192,10 @@ To use the Google Cloud Provider Certificate Manager Universal Orchestrator exte
         | Client Machine | GCP Project ID for your account. |
         | Store Path | This is not used and should be defaulted to n/a per the certificate store type set up. |
         | Orchestrator | Select an approved orchestrator capable of managing `GcpCertMgr` certificates. Specifically, one with the `GcpCertMgr` capability. |
-        | Location | **global** is the default but could be another region based on the project. |
+        | Location | The GCP region used for this Certificate Manager instance.  **global** is the default but could be another region based on the project. |
         | ServiceAccountKey | The file name of the Google Cloud Service Account Key File installed in the same folder as the orchestrator extension. Empty if the orchestrator server resides in GCP and you are not using a service account key. |
 
 
-        
-
-        <details><summary>Attributes eligible for retrieval by a PAM Provider on the Universal Orchestrator</summary>
-
-        If a PAM provider was installed _on the Universal Orchestrator_ in the [Installation](#Installation) section, the following parameters can be configured for retrieval _on the Universal Orchestrator_.
-        | Attribute | Description |
-        | --------- | ----------- |
-        | Location | **global** is the default but could be another region based on the project. |
-
-
-        Please refer to the **Universal Orchestrator (remote)** usage section ([PAM providers on the Keyfactor Integration Catalog](https://keyfactor.github.io/integrations-catalog/content/pam)) for your selected PAM provider for instructions on how to load attributes orchestrator-side.
-
-        > Any secret can be rendered by a PAM provider _installed on the Keyfactor Command server_. The above parameters are specific to attributes that can be fetched by an installed PAM provider running on the Universal Orchestrator server itself. 
-        </details>
         
 
     </details>
@@ -239,22 +219,10 @@ To use the Google Cloud Provider Certificate Manager Universal Orchestrator exte
         | Client Machine | GCP Project ID for your account. |
         | Store Path | This is not used and should be defaulted to n/a per the certificate store type set up. |
         | Orchestrator | Select an approved orchestrator capable of managing `GcpCertMgr` certificates. Specifically, one with the `GcpCertMgr` capability. |
-        | Location | **global** is the default but could be another region based on the project. |
+        | Location | The GCP region used for this Certificate Manager instance.  **global** is the default but could be another region based on the project. |
         | ServiceAccountKey | The file name of the Google Cloud Service Account Key File installed in the same folder as the orchestrator extension. Empty if the orchestrator server resides in GCP and you are not using a service account key. |
 
 
-        
-
-        <details><summary>Attributes eligible for retrieval by a PAM Provider on the Universal Orchestrator</summary>
-
-        If a PAM provider was installed _on the Universal Orchestrator_ in the [Installation](#Installation) section, the following parameters can be configured for retrieval _on the Universal Orchestrator_.
-        | Attribute | Description |
-        | --------- | ----------- |
-        | Location | **global** is the default but could be another region based on the project. |
-
-
-        > Any secret can be rendered by a PAM provider _installed on the Keyfactor Command server_. The above parameters are specific to attributes that can be fetched by an installed PAM provider running on the Universal Orchestrator server itself. 
-        </details>
         
 
     3. **Import the CSV file to create the certificate stores** 

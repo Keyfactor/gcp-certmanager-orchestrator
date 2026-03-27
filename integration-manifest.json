@@ -3,7 +3,7 @@
     "integration_type": "orchestrator",
     "name": "Google Cloud Provider Certificate Manager",
     "status": "production",
-    "update_catalog": false,
+    "update_catalog": true,
     "support_level": "kf-supported",
     "link_github": true,
     "release_dir": "GcpCertManager/bin/release",

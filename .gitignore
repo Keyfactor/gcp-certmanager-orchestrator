@@ -3,6 +3,11 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
+# Local credentials and per-machine IDE state - never commit
+.secrets/
+*.env
+.claude/
+
 # User-specific files
 *.rsuser
 *.suo

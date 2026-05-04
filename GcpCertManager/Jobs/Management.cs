@@ -1,33 +1,30 @@
-﻿// Copyright 2025 Keyfactor
+// Copyright 2025 Keyfactor
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 // Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions
 // and limitations under the License.
 using System;
-using System.Collections.Generic;
-using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Text;
-using Google;
+using System.Threading;
 using Google.Apis.CertificateManager.v1;
 using Google.Apis.CertificateManager.v1.Data;
 using Keyfactor.Extensions.Orchestrator.GcpCertManager.Client;
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
+using Keyfactor.Orchestrators.Extensions.Interfaces;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Org.BouncyCastle.Crypto;
 using Org.BouncyCastle.OpenSsl;
 using Org.BouncyCastle.Pkcs;
-using Org.BouncyCastle.X509;
-using static Org.BouncyCastle.Math.EC.ECCurve;
 
 namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
 {
-    public class Management : IManagementJobExtension
+    public class Management : JobBase, IManagementJobExtension
     {
         private static readonly string certStart = "-----BEGIN CERTIFICATE-----\n";
         private static readonly string certEnd = "\n-----END CERTIFICATE-----";
@@ -38,433 +35,288 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
         private static readonly Func<string, string> Pemify = ss =>
             ss.Length <= 64 ? ss : ss.Substring(0, 64) + "\n" + Pemify(ss.Substring(64));
 
-        private readonly ILogger<Management> _logger;
-
-        public Management(ILogger<Management> logger)
-        {
-            _logger = logger;
-        }
-
         protected internal virtual AsymmetricKeyEntry KeyEntry { get; set; }
-
         protected internal string CertificateName { get; set; }
 
-        public string ExtensionName => "";
+        public Management(IPAMSecretResolver resolver) : base(resolver)
+        {
+            Logger = LogHandler.GetClassLogger<Management>();
+        }
 
+        public string ExtensionName => "GcpCertMgr";
 
         public JobResult ProcessJob(ManagementJobConfiguration jobConfiguration)
         {
-            try
+            if (jobConfiguration == null)
             {
-                _logger.MethodEntry(LogLevel.Debug);
-
-                return PerformManagement(jobConfiguration);
+                Logger.LogError("ProcessJob called with null jobConfiguration.");
+                return FailureResult(0, "ManagementJobConfiguration is null.");
             }
-            catch (Exception e)
+
+            using (var flow = new FlowLogger(Logger, "GcpCertMgr-Management"))
             {
-                _logger.LogError($"Error Occurred in Management.ProcessJob: {LogHandler.FlattenException(e)}");
-                throw;
+                try
+                {
+                    Logger.MethodEntry(LogLevel.Debug);
+                    return PerformManagement(jobConfiguration, flow);
+                }
+                catch (Exception e)
+                {
+                    var msg = DescribeException(e);
+                    flow.Fail("ProcessJob", msg);
+                    Logger.LogError(e, "Error in Management.ProcessJob: {ErrorMessage}", LogHandler.FlattenException(e));
+                    return FailureResult(jobConfiguration.JobHistoryId,
+                        $"Management failed: {msg}", flow);
+                }
+                finally
+                {
+                    Logger.MethodExit(LogLevel.Debug);
+                }
             }
         }
 
-        private JobResult PerformManagement(ManagementJobConfiguration config)
+        private JobResult PerformManagement(ManagementJobConfiguration config, FlowLogger flow)
         {
-            try
+            StoreProperties storeProperties = null;
+            flow.Step("ParseStoreProperties", () =>
             {
-                _logger.MethodEntry();
-
-                StoreProperties storeProperties = JsonConvert.DeserializeObject<StoreProperties>(config.CertificateStoreDetails.Properties,
+                storeProperties = JsonConvert.DeserializeObject<StoreProperties>(
+                    config.CertificateStoreDetails.Properties,
                     new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
                 storeProperties.ProjectId = config.CertificateStoreDetails.ClientMachine;
+            }, $"projectId={config.CertificateStoreDetails.ClientMachine}");
 
-                _logger.LogTrace($"Store Properties:");
-                _logger.LogTrace($"  Location: {storeProperties.Location}");
-                _logger.LogTrace($"  Project Id: {storeProperties.ProjectId}");
-                _logger.LogTrace($"  Service Account Key Path: {storeProperties.ServiceAccountKey}");
+            Logger.LogTrace("Store Properties:");
+            Logger.LogTrace("  Location: {Location}", storeProperties.Location);
+            Logger.LogTrace("  Project Id: {ProjectId}", storeProperties.ProjectId);
+            Logger.LogTrace("  Service Account Key Path: {ServiceAccountKey}", storeProperties.ServiceAccountKey);
 
-                _logger.LogTrace("Getting Credentials from Google...");
-                var svc = new GcpCertificateManagerClient().GetGoogleCredentials(storeProperties.ServiceAccountKey);
-                _logger.LogTrace("Got Credentials from Google");
-
-                var storePath = $"projects/{storeProperties.ProjectId}/locations/{storeProperties.Location}";
-                CertificateName = config.JobCertificate.Alias;
-
-                var complete = new JobResult
-                {
-                    Result = OrchestratorJobStatusJobResult.Failure,
-                    JobHistoryId = config.JobHistoryId,
-                    FailureMessage =
-                        "Invalid Management Operation"
-                };
-
-                switch (config.OperationType)
-                {
-                    case CertStoreOperationType.Add:
-                        _logger.LogTrace("Adding...");
-                        complete = PerformAddition(svc, config, storePath);
-                        break;
-                    case CertStoreOperationType.Remove:
-                        _logger.LogTrace("Removing...");
-                        complete = PerformRemoval(svc, config, storePath);
-                        break;
-                    default:
-                        return complete;
-                }
-
-                _logger.MethodExit();
-                return complete;
-            }
-            catch (GoogleApiException e)
+            CertificateManagerService svc = null;
+            flow.Step("GetGoogleCredentials", () =>
             {
-                var googleError = e.Error?.ErrorResponseContent + " " + LogHandler.FlattenException(e);
-                return new JobResult
-                {
-                    Result = OrchestratorJobStatusJobResult.Failure,
-                    JobHistoryId = config.JobHistoryId,
-                    FailureMessage =
-                        $"Management {googleError}"
-                };
-            }
-            catch (Exception e)
+                svc = new GcpCertificateManagerClient().GetGoogleCredentials(storeProperties.ServiceAccountKey);
+            }, $"source={(string.IsNullOrEmpty(storeProperties.ServiceAccountKey) ? "ADC" : "file")}");
+
+            var storePath = $"projects/{storeProperties.ProjectId}/locations/{storeProperties.Location}";
+            CertificateName = config.JobCertificate.Alias;
+            flow.Step("StorePathResolved", $"storePath={storePath}, alias={CertificateName}");
+
+            switch (config.OperationType)
             {
-                _logger.LogError($"Error Occurred in Management.PerformManagement: {LogHandler.FlattenException(e)}");
-                throw;
+                case CertStoreOperationType.Add:
+                    flow.Branch("Add");
+                    try { return PerformAddition(svc, config, storePath, flow); }
+                    finally { flow.EndBranch(); }
+                case CertStoreOperationType.Remove:
+                    flow.Branch("Remove");
+                    try { return PerformRemoval(svc, config, storePath, flow); }
+                    finally { flow.EndBranch(); }
+                default:
+                    flow.Fail("OperationType", $"unsupported: {config.OperationType}");
+                    return FailureResult(config.JobHistoryId, "Invalid Management Operation", flow);
             }
         }
 
-
-        private JobResult PerformRemoval(CertificateManagerService svc, ManagementJobConfiguration config, string storePath)
+        private JobResult PerformRemoval(CertificateManagerService svc, ManagementJobConfiguration config,
+            string storePath, FlowLogger flow)
         {
-            try
-            {
-                _logger.MethodEntry();
-
-                DeleteCertificate(CertificateName, svc, storePath);
-
-                _logger.MethodExit();
-                return new JobResult
-                {
-                    Result = OrchestratorJobStatusJobResult.Success,
-                    JobHistoryId = config.JobHistoryId,
-                    FailureMessage = ""
-                };
-            }
-            catch (GoogleApiException e)
-            {
-                var googleError = e.Error?.ErrorResponseContent + " " + LogHandler.FlattenException(e);
-                return new JobResult
-                {
-                    Result = OrchestratorJobStatusJobResult.Failure,
-                    JobHistoryId = config.JobHistoryId,
-                    FailureMessage =
-                        $"Management/Remove {googleError}"
-                };
-            }
-            catch (Exception e)
-            {
-                return new JobResult
-                {
-                    Result = OrchestratorJobStatusJobResult.Failure,
-                    JobHistoryId = config.JobHistoryId,
-                    FailureMessage = $"Management/Remove: {LogHandler.FlattenException(e)}"
-                };
-            }
+            flow.Step("DeleteCertificate", () => DeleteCertificate(CertificateName, svc, storePath, flow));
+            flow.Step("Result", "SUCCESS - certificate removed");
+            return SuccessResult(config.JobHistoryId, flow.GetSummary());
         }
 
-
-        private JobResult PerformAddition(CertificateManagerService svc, ManagementJobConfiguration config, string storePath)
+        private JobResult PerformAddition(CertificateManagerService svc, ManagementJobConfiguration config,
+            string storePath, FlowLogger flow)
         {
-            //Temporarily only performing additions
-            try
+            var duplicate = false;
+            flow.Step("CheckForDuplicate", () => duplicate = CheckForDuplicate(storePath, CertificateName, svc),
+                $"alias={CertificateName}");
+            Logger.LogTrace("Duplicate? = {Duplicate}", duplicate);
+
+            if (duplicate && !config.Overwrite)
             {
-                _logger.MethodEntry();
+                flow.Fail("DuplicateGuard",
+                    $"alias '{config.JobCertificate.Alias}' exists; overwrite flag was not set");
+                return FailureResult(config.JobHistoryId,
+                    $"Duplicate alias {config.JobCertificate.Alias} found in Google Certificate Manager. To overwrite use the overwrite flag.",
+                    flow);
+            }
 
-                var client = new GcpCertificateManagerClient();
+            if (string.IsNullOrWhiteSpace(config.JobCertificate.PrivateKeyPassword))
+            {
+                // Existing behaviour: this orchestrator only handles PFX entries with a
+                // private key password. Surface this clearly rather than silently no-op.
+                flow.Fail("PrivateKeyPassword", "missing - this orchestrator only supports PFX entries with a private key password");
+                return FailureResult(config.JobHistoryId,
+                    "Management/Add requires a PFX certificate with a private key password.", flow);
+            }
 
-                var duplicate = CheckForDuplicate(storePath, CertificateName, svc);
-                _logger.LogTrace($"Duplicate? = {duplicate}");
+            if (string.IsNullOrWhiteSpace(config.JobCertificate.Alias))
+            {
+                Logger.LogTrace("No Alias Found");
+            }
 
-                //Check for Duplicate already in Google Certificate Manager, if there, make sure the Overwrite flag is checked before replacing
-                if (duplicate && config.Overwrite || !duplicate)
+            // Load PFX
+            Pkcs12Store p = null;
+            flow.Step("LoadPkcs12", () =>
+            {
+                var pfxBytes = Convert.FromBase64String(config.JobCertificate.Contents);
+                using (var pfxBytesMemoryStream = new MemoryStream(pfxBytes))
                 {
-                    _logger.LogTrace("Either not a duplicate or overwrite was chosen....");
-                    if (!string.IsNullOrWhiteSpace(config.JobCertificate.PrivateKeyPassword)) // This is a PFX Entry
-                    {
-
-                        if (string.IsNullOrWhiteSpace(config.JobCertificate.Alias))
-                            _logger.LogTrace("No Alias Found");
-
-                        // Load PFX
-                        var pfxBytes = Convert.FromBase64String(config.JobCertificate.Contents);
-                        Pkcs12Store p;
-                        using (var pfxBytesMemoryStream = new MemoryStream(pfxBytes))
-                        {
-                            p = new Pkcs12Store(pfxBytesMemoryStream,
-                                config.JobCertificate.PrivateKeyPassword.ToCharArray());
-                        }
-
-                        _logger.LogTrace(
-                            $"Created Pkcs12Store containing Alias {config.JobCertificate.Alias} Contains Alias is {p.ContainsAlias(config.JobCertificate.Alias)}");
-
-                        // Extract private key
-                        string alias;
-                        string privateKeyString;
-                        using (var memoryStream = new MemoryStream())
-                        {
-                            using (TextWriter streamWriter = new StreamWriter(memoryStream))
-                            {
-                                _logger.LogTrace("Extracting Private Key...");
-                                var pemWriter = new PemWriter(streamWriter);
-                                _logger.LogTrace("Created pemWriter...");
-                                alias = p.Aliases.Cast<string>().SingleOrDefault(a => p.IsKeyEntry(a));
-                                _logger.LogTrace($"Alias = {alias}");
-                                var publicKey = p.GetCertificate(alias).Certificate.GetPublicKey();
-                                _logger.LogTrace($"publicKey = {publicKey}");
-                                KeyEntry = p.GetKey(alias);
-                                _logger.LogTrace($"KeyEntry = {KeyEntry}");
-                                if (KeyEntry == null) throw new Exception("Unable to retrieve private key");
-
-                                var privateKey = KeyEntry.Key;
-                                var keyPair = new AsymmetricCipherKeyPair(publicKey, privateKey);
-
-                                pemWriter.WriteObject(keyPair.Private);
-                                streamWriter.Flush();
-                                privateKeyString = Encoding.ASCII.GetString(memoryStream.GetBuffer()).Trim()
-                                    .Replace("\r", "").Replace("\0", "");
-                                memoryStream.Close();
-                                streamWriter.Close();
-                                _logger.LogTrace("Finished Extracting Private Key...");
-                            }
-                        }
-
-                        var pubCertPem =
-                            Pemify(Convert.ToBase64String(p.GetCertificate(alias).Certificate.GetEncoded()));
-                        _logger.LogTrace($"Public cert Pem {pubCertPem}");
-
-                        var certPem = privateKeyString + certStart + pubCertPem + certEnd;
-
-                        _logger.LogTrace($"Got certPem {certPem}");
-
-                        pubCertPem = $"-----BEGIN CERTIFICATE-----\r\n{pubCertPem}\r\n-----END CERTIFICATE-----";
-
-                        _logger.LogTrace($"Public Cert Pem: {pubCertPem}");
-
-                        //Create the certificate in Google
-                        var gCertificate = new Certificate
-                        {
-                            SelfManaged = new SelfManagedCertificate
-                            { PemCertificate = pubCertPem, PemPrivateKey = privateKeyString },
-                            Name = CertificateName,
-                            Description = CertificateName,
-                            Scope = "DEFAULT" //Scope does not come back in inventory so just hard code it for now
-                        };
-
-                        _logger.LogTrace(
-                            $"Created Google Certificate Object: {JsonConvert.SerializeObject(gCertificate)}");
-
-                        if (duplicate && config.Overwrite)
-                            ReplaceCertificate(gCertificate, svc, storePath);
-                        else
-                            AddCertificate(gCertificate, svc, storePath);
-
-                        _logger.MethodExit();
-
-                        //Return success from job
-                        return new JobResult
-                        {
-                            Result = OrchestratorJobStatusJobResult.Success,
-                            JobHistoryId = config.JobHistoryId,
-                            FailureMessage = ""
-                        };
-                    }
+                    p = new Pkcs12Store(pfxBytesMemoryStream,
+                        config.JobCertificate.PrivateKeyPassword.ToCharArray());
                 }
-                _logger.MethodExit();
-                return new JobResult
-                {
-                    Result = OrchestratorJobStatusJobResult.Failure,
-                    JobHistoryId = config.JobHistoryId,
-                    FailureMessage =
-                        $"Duplicate alias {config.JobCertificate.Alias} found in Google Certificate Manager.  To overwrite use the overwrite flag."
-                };
-            }
-            catch (GoogleApiException e)
-            {
-                var googleError = e.Error?.ErrorResponseContent + " " + LogHandler.FlattenException(e);
-                _logger.LogError($"PerformManagement Error: {LogHandler.FlattenException(e)}");
+            });
 
-                return new JobResult
-                {
-                    Result = OrchestratorJobStatusJobResult.Failure,
-                    JobHistoryId = config.JobHistoryId,
-                    FailureMessage =
-                        $"Management/Add {googleError}"
-                };
-            }
-            catch (Exception e)
-            {
-                _logger.LogError($"PerformManagement Error: {LogHandler.FlattenException(e)}");
+            Logger.LogTrace("Created Pkcs12Store containing Alias {Alias} Contains Alias is {Contains}",
+                config.JobCertificate.Alias, p.ContainsAlias(config.JobCertificate.Alias));
 
-                return new JobResult
+            // Extract private key
+            string alias = null;
+            string privateKeyString = null;
+            flow.Step("ExtractPrivateKey", () =>
+            {
+                using (var memoryStream = new MemoryStream())
+                using (TextWriter streamWriter = new StreamWriter(memoryStream))
                 {
-                    Result = OrchestratorJobStatusJobResult.Failure,
-                    JobHistoryId = config.JobHistoryId,
-                    FailureMessage = $"Management/Add {LogHandler.FlattenException(e)}"
-                };
+                    var pemWriter = new PemWriter(streamWriter);
+                    alias = p.Aliases.Cast<string>().SingleOrDefault(a => p.IsKeyEntry(a));
+                    Logger.LogTrace("Alias = {Alias}", alias);
+                    var publicKey = p.GetCertificate(alias).Certificate.GetPublicKey();
+                    KeyEntry = p.GetKey(alias);
+                    if (KeyEntry == null) throw new Exception("Unable to retrieve private key");
+
+                    var privateKey = KeyEntry.Key;
+                    var keyPair = new AsymmetricCipherKeyPair(publicKey, privateKey);
+
+                    pemWriter.WriteObject(keyPair.Private);
+                    streamWriter.Flush();
+                    privateKeyString = Encoding.ASCII.GetString(memoryStream.GetBuffer()).Trim()
+                        .Replace("\r", "").Replace("\0", "");
+                }
+            });
+
+            var pubCertPem = Pemify(Convert.ToBase64String(p.GetCertificate(alias).Certificate.GetEncoded()));
+            // Don't log private key material - only the public chain + alias.
+            Logger.LogTrace("Public cert PEM extracted for alias {Alias}", alias);
+
+            // Note: certPem includes the (decrypted) private key. It is intentionally NOT
+            // logged. The variable is retained because the legacy code computed it inline;
+            // the actual upload below uses pubCertPem + privateKeyString separately.
+            var certPem = privateKeyString + certStart + pubCertPem + certEnd;
+            _ = certPem;
+
+            pubCertPem = $"-----BEGIN CERTIFICATE-----\r\n{pubCertPem}\r\n-----END CERTIFICATE-----";
+
+            // Build the GCP certificate object. Don't serialize+log; that would leak the
+            // private key into trace logs.
+            var gCertificate = new Certificate
+            {
+                SelfManaged = new SelfManagedCertificate { PemCertificate = pubCertPem, PemPrivateKey = privateKeyString },
+                Name = CertificateName,
+                Description = CertificateName,
+                // Scope does not come back in inventory, so hard-code it. Customers
+                // running edge-cache stores will need to override this in a future
+                // store-property if/when that scope becomes used.
+                Scope = "DEFAULT"
+            };
+
+            if (duplicate && config.Overwrite)
+            {
+                flow.Step("ReplaceCertificate", () => ReplaceCertificate(gCertificate, svc, storePath, flow));
             }
+            else
+            {
+                flow.Step("AddCertificate", () => AddCertificate(gCertificate, svc, storePath, flow));
+            }
+
+            flow.Step("Result", duplicate ? "SUCCESS - certificate replaced" : "SUCCESS - certificate added");
+            return SuccessResult(config.JobHistoryId, flow.GetSummary());
         }
 
-        private void AddCertificate(Certificate gCertificate, CertificateManagerService svc, string storePath)
+        private void AddCertificate(Certificate gCertificate, CertificateManagerService svc, string storePath, FlowLogger flow)
         {
             var addCertificateRequest = svc.Projects.Locations.Certificates.Create(gCertificate, storePath);
             addCertificateRequest.CertificateId = gCertificate.Name;
 
             var addCertificateResponse = addCertificateRequest.Execute();
-            WaitForOperation(svc, addCertificateResponse.Name);
+            flow.Step("WaitForOperation-Add", () => WaitForOperation(svc, addCertificateResponse.Name),
+                $"operation={addCertificateResponse.Name}");
 
-            _logger.LogTrace($"Certificate Created in Google Cert Manager with Name {addCertificateResponse.Name}");
-
-            _logger.MethodExit();
+            Logger.LogTrace("Certificate Created in Google Cert Manager with Name {Name}", addCertificateResponse.Name);
         }
 
-        private void ReplaceCertificate(Certificate gCertificate, CertificateManagerService svc, string storePath)
+        private void ReplaceCertificate(Certificate gCertificate, CertificateManagerService svc, string storePath, FlowLogger flow)
         {
-            _logger.MethodEntry();
-
             var replaceCertificateRequest = svc.Projects.Locations.Certificates.Patch(gCertificate, storePath + $"/certificates/{CertificateName}");
             replaceCertificateRequest.UpdateMask = "SelfManaged";
 
             var replaceCertificateResponse = replaceCertificateRequest.Execute();
-            WaitForOperation(svc, replaceCertificateResponse.Name);
+            flow.Step("WaitForOperation-Replace", () => WaitForOperation(svc, replaceCertificateResponse.Name),
+                $"operation={replaceCertificateResponse.Name}");
 
-            _logger.LogTrace($"Certificate Replaced in Google Cert Manager with Name {replaceCertificateResponse.Name}");
-
-            _logger.MethodExit();
+            Logger.LogTrace("Certificate Replaced in Google Cert Manager with Name {Name}", replaceCertificateResponse.Name);
         }
 
-        private void DeleteCertificate(string certificateName,
-            CertificateManagerService svc, string storePath)
+        private void DeleteCertificate(string certificateName, CertificateManagerService svc, string storePath, FlowLogger flow)
         {
-            try
+            var certificatesRequest = svc.Projects.Locations.Certificates.List(storePath);
+            certificatesRequest.Filter = $"name=\"{storePath}/certificates/{certificateName}\"";
+
+            var certificatesResponse = certificatesRequest.Execute();
+            Logger.LogTrace("certificatesResponse Json {Response}", JsonConvert.SerializeObject(certificatesResponse));
+
+            if (certificatesResponse?.Certificates?.Count > 0)
             {
-                _logger.MethodEntry();
+                var deleteCertificateRequest =
+                    svc.Projects.Locations.Certificates.Delete(storePath + $"/certificates/{certificateName}");
 
-                var certificatesRequest = svc.Projects.Locations.Certificates.List(storePath);
-                certificatesRequest.Filter = $"name=\"{storePath}/certificates/{certificateName}\"";
+                var deleteCertificateResponse = deleteCertificateRequest.Execute();
+                Logger.LogTrace("deleteCertificateResponse Json {Response}", JsonConvert.SerializeObject(deleteCertificateResponse));
+                flow.Step("WaitForOperation-Delete", () => WaitForOperation(svc, deleteCertificateResponse.Name),
+                    $"operation={deleteCertificateResponse.Name}");
 
-                var certificatesResponse = certificatesRequest.Execute();
-                _logger.LogTrace($"certificatesResponse Json {JsonConvert.SerializeObject(certificatesResponse)}");
-
-                if (certificatesResponse?.Certificates?.Count > 0)
-                {
-                    var deleteCertificateRequest =
-                        svc.Projects.Locations.Certificates.Delete(storePath + $"/certificates/{certificateName}");
-
-                    var deleteCertificateResponse = deleteCertificateRequest.Execute();
-                    _logger.LogTrace(
-                        $"deleteCertificateResponse Json {JsonConvert.SerializeObject(deleteCertificateResponse)}");
-                    WaitForOperation(svc, deleteCertificateResponse.Name);
-
-                    _logger.LogTrace($"Deleted {deleteCertificateResponse.Name} Certificate During Replace Procedure");
-                }
-                else
-                {
-                    string msg = $"Certificate {certificateName} not found for {storePath}.";
-                    _logger.LogWarning(msg);
-                    throw new Exception(msg);
-                }
-
-                _logger.MethodExit();
+                Logger.LogTrace("Deleted {Name} Certificate", deleteCertificateResponse.Name);
             }
-            catch (Exception e)
+            else
             {
-                _logger.LogError($"Error occured in Management.DeleteCertificate: {LogHandler.FlattenException(e)}");
-                throw;
+                var msg = $"Certificate {certificateName} not found for {storePath}.";
+                Logger.LogWarning(msg);
+                throw new Exception(msg);
             }
         }
 
         private bool CheckForDuplicate(string path, string alias, CertificateManagerService client)
         {
-            try
-            {
-                _logger.MethodEntry();
-                var certificatesRequest =
-                    client.Projects.Locations.Certificates.List(path);
-                certificatesRequest.Filter = $"name=\"{path}/certificates/{alias}\"";
+            var certificatesRequest = client.Projects.Locations.Certificates.List(path);
+            certificatesRequest.Filter = $"name=\"{path}/certificates/{alias}\"";
 
-                var certificatesResponse = certificatesRequest.Execute();
-                _logger.LogTrace($"certificatesResponse Json {JsonConvert.SerializeObject(certificatesResponse)}");
+            var certificatesResponse = certificatesRequest.Execute();
+            Logger.LogTrace("certificatesResponse Json {Response}", JsonConvert.SerializeObject(certificatesResponse));
 
-                if (certificatesResponse?.Certificates?.Count == 1)
-                {
-                    _logger.MethodExit();
-                    return true;
-                }
-
-                _logger.MethodExit();
-                return false;
-            }
-            catch (Exception e)
-            {
-                _logger.LogError(
-                    $"Error Checking for Duplicate Cert in Management.CheckForDuplicate {LogHandler.FlattenException(e)}");
-                throw;
-            }
+            return certificatesResponse?.Certificates?.Count == 1;
         }
 
         private void WaitForOperation(CertificateManagerService client, string operationName)
         {
-            _logger.MethodEntry();
-
-            DateTime endTime = DateTime.Now.AddMilliseconds(OPERATION_MAX_WAIT_MILLISECONDS);
-            Operation operation = new Operation();
-            ProjectsResource.LocationsResource.OperationsResource.GetRequest getRequest = client.Projects.Locations.Operations.Get(operationName);
+            var endTime = DateTime.Now.AddMilliseconds(OPERATION_MAX_WAIT_MILLISECONDS);
+            var getRequest = client.Projects.Locations.Operations.Get(operationName);
 
             while (DateTime.Now < endTime)
             {
-                _logger.LogTrace($"Attempting WAIT for {operationName} at {DateTime.Now.ToString()}.");
-                operation = getRequest.Execute();
+                Logger.LogTrace("Attempting WAIT for {OperationName} at {Now}.", operationName, DateTime.Now);
+                var operation = getRequest.Execute();
 
                 if (operation.Done == true)
                 {
-                    _logger.LogDebug($"End WAIT for {operationName}. Task DONE.");
-                    _logger.MethodExit();
+                    Logger.LogDebug("End WAIT for {OperationName}. Task DONE.", operationName);
                     return;
                 }
 
-                System.Threading.Thread.Sleep(OPERATION_INTERVAL_WAIT_MILLISECONDS);
+                Thread.Sleep(OPERATION_INTERVAL_WAIT_MILLISECONDS);
             }
 
-            _logger.MethodExit();
-            throw new Exception($"{operationName} was still processing after the {OPERATION_MAX_WAIT_MILLISECONDS.ToString()} millisecond maximum wait time.");
-        }
-
-        private string GetCommonNameFromSubject(string subject)
-        {
-            try
-            {
-                _logger.MethodEntry();
-                var array1 = subject.Split(',');
-                foreach (var x in array1)
-                {
-                    var itemArray = x.Split('=');
-
-                    switch (itemArray[0].ToUpper())
-                    {
-                        case "CN":
-                            return itemArray[1];
-                    }
-                }
-
-                _logger.LogTrace("Could not get subject returning empty string...");
-                _logger.MethodExit();
-                return "";
-            }
-            catch (Exception e)
-            {
-                _logger.LogError(
-                    $"Error Checking for Duplicate Cert in Management.GetCommonNameFromSubject {LogHandler.FlattenException(e)}");
-                throw;
-            }
+            throw new Exception($"{operationName} was still processing after the {OPERATION_MAX_WAIT_MILLISECONDS} millisecond maximum wait time.");
         }
     }
 }

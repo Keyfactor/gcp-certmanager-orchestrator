@@ -8,152 +8,156 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using Google;
 using Google.Apis.CertificateManager.v1;
+using Google.Apis.CertificateManager.v1.Data;
 using Keyfactor.Extensions.Orchestrator.GcpCertManager.Client;
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
+using Keyfactor.Orchestrators.Extensions.Interfaces;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
 namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
 {
-    public class Inventory : IInventoryJobExtension
+    public class Inventory : JobBase, IInventoryJobExtension
     {
-        private readonly ILogger<Inventory> _logger;
-
-        public Inventory(ILogger<Inventory> logger)
+        public Inventory(IPAMSecretResolver resolver) : base(resolver)
         {
-            _logger = logger;
+            Logger = LogHandler.GetClassLogger<Inventory>();
         }
 
-        public string ExtensionName => "";
+        public string ExtensionName => "GcpCertMgr";
 
         public JobResult ProcessJob(InventoryJobConfiguration jobConfiguration,
             SubmitInventoryUpdate submitInventoryUpdate)
         {
-            try
+            if (jobConfiguration == null)
             {
-                _logger.MethodEntry();
-                return PerformInventory(jobConfiguration, submitInventoryUpdate);
+                Logger.LogError("ProcessJob called with null jobConfiguration.");
+                return FailureResult(0, "InventoryJobConfiguration is null.");
             }
-            catch (Exception e)
+
+            if (submitInventoryUpdate == null)
             {
-                _logger.LogError($"Error occured in Inventory.ProcessJob: {LogHandler.FlattenException(e)}");
-                throw;
+                Logger.LogError("ProcessJob called with null submitInventoryUpdate.");
+                return FailureResult(jobConfiguration.JobHistoryId, "SubmitInventoryUpdate delegate is null.");
+            }
+
+            using (var flow = new FlowLogger(Logger, "GcpCertMgr-Inventory"))
+            {
+                try
+                {
+                    Logger.MethodEntry(LogLevel.Debug);
+                    return PerformInventory(jobConfiguration, submitInventoryUpdate, flow);
+                }
+                catch (Exception e)
+                {
+                    var msg = DescribeException(e);
+                    flow.Fail("ProcessJob", msg);
+                    Logger.LogError(e, "Error in Inventory.ProcessJob: {ErrorMessage}", LogHandler.FlattenException(e));
+                    return FailureResult(jobConfiguration.JobHistoryId,
+                        $"Inventory failed: {msg}", flow);
+                }
+                finally
+                {
+                    Logger.MethodExit(LogLevel.Debug);
+                }
             }
         }
 
-        private JobResult PerformInventory(InventoryJobConfiguration config, SubmitInventoryUpdate submitInventory)
+        private JobResult PerformInventory(InventoryJobConfiguration config,
+            SubmitInventoryUpdate submitInventory, FlowLogger flow)
         {
-            try
+            StoreProperties storeProperties = null;
+            flow.Step("ParseStoreProperties", () =>
             {
-                _logger.MethodEntry(LogLevel.Debug);
-
-                StoreProperties storeProperties = JsonConvert.DeserializeObject<StoreProperties>(config.CertificateStoreDetails.Properties,
-                    new JsonSerializerSettings {DefaultValueHandling = DefaultValueHandling.Populate});
+                storeProperties = JsonConvert.DeserializeObject<StoreProperties>(
+                    config.CertificateStoreDetails.Properties,
+                    new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
                 storeProperties.ProjectId = config.CertificateStoreDetails.ClientMachine;
+            }, $"projectId={config.CertificateStoreDetails.ClientMachine}");
 
-                _logger.LogTrace($"Store Properties:");
-                _logger.LogTrace($"  Location: {storeProperties.Location}"); 
-                _logger.LogTrace($"  Project Id: {storeProperties.ProjectId}");
-                _logger.LogTrace($"  Service Account Key Path: {storeProperties.ServiceAccountKey}");
+            Logger.LogTrace("Store Properties:");
+            Logger.LogTrace("  Location: {Location}", storeProperties.Location);
+            Logger.LogTrace("  Project Id: {ProjectId}", storeProperties.ProjectId);
+            // ServiceAccountKey is a file PATH, not a secret value, so it is fine to log.
+            Logger.LogTrace("  Service Account Key Path: {ServiceAccountKey}", storeProperties.ServiceAccountKey);
 
-                _logger.LogTrace("Getting Credentials from Google...");
-                var svc = new GcpCertificateManagerClient().GetGoogleCredentials(storeProperties.ServiceAccountKey);
-                _logger.LogTrace("Got Credentials from Google");
+            CertificateManagerService svc = null;
+            flow.Step("GetGoogleCredentials", () =>
+            {
+                svc = new GcpCertificateManagerClient().GetGoogleCredentials(storeProperties.ServiceAccountKey);
+            }, $"source={(string.IsNullOrEmpty(storeProperties.ServiceAccountKey) ? "ADC" : "file")}");
 
-                var warningFlag = false;
-                var sb = new StringBuilder();
-                sb.Append("");
-                var inventoryItems = new List<CurrentInventoryItem>();
-                var nextPageToken = string.Empty;
+            var warningFlag = false;
+            var sb = new StringBuilder();
+            var inventoryItems = new List<CurrentInventoryItem>();
+            var nextPageToken = string.Empty;
+            var storePath = $"projects/{storeProperties.ProjectId}/locations/{storeProperties.Location}";
 
-                //todo support labels
-                var storePath = $"projects/{storeProperties.ProjectId}/locations/{storeProperties.Location}";
+            flow.Step("StorePathResolved", $"storePath={storePath}");
 
-                do
+            var pageCount = 0;
+            do
+            {
+                pageCount++;
+                ListCertificatesResponse certificatesResponse = null;
+                var token = nextPageToken;
+                flow.Step($"ListCertificates-page{pageCount}", () =>
                 {
-                    var certificatesRequest =
-                    svc.Projects.Locations.Certificates.List(storePath);
+                    var certificatesRequest = svc.Projects.Locations.Certificates.List(storePath);
                     certificatesRequest.Filter = "pemCertificate!=\"\"";
                     certificatesRequest.PageSize = 100;
-                    if (nextPageToken?.Length > 0) certificatesRequest.PageToken = nextPageToken;
+                    if (!string.IsNullOrEmpty(token)) certificatesRequest.PageToken = token;
 
-                    var certificatesResponse = certificatesRequest.Execute();
-                    _logger.LogTrace(
-                        $"certificatesResponse: {JsonConvert.SerializeObject(certificatesResponse)}");
+                    certificatesResponse = certificatesRequest.Execute();
+                });
 
-                    nextPageToken = null;
-                    //Debug Write Certificate List Response from Google Cert Manager
-                    if (certificatesResponse?.Certificates != null)
-                        inventoryItems.AddRange(certificatesResponse.Certificates.Select(
-                            c =>
-                            {
-                                try
-                                {
-                                    _logger.LogTrace(
-                                        $"Building Cert List Inventory Item Alias: {c.Name} Pem: {c.PemCertificate} Private Key: dummy (from PA API)");
-                                    return BuildInventoryItem(c.Name, c.PemCertificate,
-                                        true, storePath, svc);
-                                }
-                                catch
-                                {
-                                    _logger.LogWarning(
-                                        $"Could not fetch the certificate: {c?.Name} associated with description {c?.Description}.");
-                                    sb.Append(
-                                        $"Could not fetch the certificate: {c?.Name} associated with issuer {c?.Description}.{Environment.NewLine}");
-                                    warningFlag = true;
-                                    return new CurrentInventoryItem();
-                                }
-                            }).Where(acsii => acsii?.Certificates != null).ToList());
+                Logger.LogTrace("certificatesResponse: {Response}", JsonConvert.SerializeObject(certificatesResponse));
 
-                        nextPageToken = certificatesResponse.NextPageToken;
-                } while (nextPageToken?.Length > 0);
-
-                _logger.LogTrace("Submitting Inventory To Keyfactor via submitInventory.Invoke");
-                submitInventory.Invoke(inventoryItems);
-                _logger.LogTrace("Submitted Inventory To Keyfactor via submitInventory.Invoke");
-
-                _logger.MethodExit(LogLevel.Debug);
-                if (warningFlag)
+                nextPageToken = null;
+                if (certificatesResponse?.Certificates != null)
                 {
-                    _logger.LogTrace("Found Warning");
-                    return new JobResult
+                    foreach (var c in certificatesResponse.Certificates)
                     {
-                        Result = OrchestratorJobStatusJobResult.Warning,
-                        JobHistoryId = config.JobHistoryId,
-                        FailureMessage = sb.ToString()
-                    };
+                        try
+                        {
+                            Logger.LogTrace(
+                                "Building Cert List Inventory Item Alias: {Name} Pem: {Pem} Private Key: dummy (from PA API)",
+                                c.Name, c.PemCertificate);
+                            var item = BuildInventoryItem(c.Name, c.PemCertificate, true, storePath, svc);
+                            if (item?.Certificates != null)
+                                inventoryItems.Add(item);
+                        }
+                        catch (Exception inner)
+                        {
+                            Logger.LogWarning("Could not fetch the certificate: {Name} associated with description {Description}. {Error}",
+                                c?.Name, c?.Description, DescribeException(inner));
+                            sb.AppendLine($"Could not fetch the certificate: {c?.Name} associated with issuer {c?.Description}.");
+                            warningFlag = true;
+                        }
+                    }
                 }
 
-                _logger.LogTrace("Return Success");
-                return new JobResult
-                {
-                    Result = OrchestratorJobStatusJobResult.Success,
-                    JobHistoryId = config.JobHistoryId,
-                    FailureMessage = sb.ToString()
-                };
-            }
-            catch (GoogleApiException e)
-            {
-                var googleError = e.Error?.ErrorResponseContent + " " + LogHandler.FlattenException(e);
+                nextPageToken = certificatesResponse?.NextPageToken;
+            } while (!string.IsNullOrEmpty(nextPageToken));
 
-                _logger.LogError($"PerformInventory Error: {LogHandler.FlattenException(e)}");
-                return new JobResult
-                {
-                    Result = OrchestratorJobStatusJobResult.Failure,
-                    JobHistoryId = config.JobHistoryId,
-                    FailureMessage =
-                        $"Management/Add {googleError}"
-                };
-            }
-            catch (Exception e)
+            flow.Step("SubmitInventory", () => submitInventory.Invoke(inventoryItems),
+                $"itemCount={inventoryItems.Count}");
+
+            // Per the playbook: append the flow summary on BOTH success and warning paths
+            // so operators reading job history can see what happened either way.
+            var summary = flow.GetSummary();
+
+            if (warningFlag)
             {
-                _logger.LogError($"PerformInventory Error: {LogHandler.FlattenException(e)}");
-                throw;
+                flow.Step("Result", "WARNING - some certificates could not be fetched");
+                return WarningResult(config.JobHistoryId, $"{sb}\n\n{summary}");
             }
+
+            flow.Step("Result", $"SUCCESS - {inventoryItems.Count} certificates");
+            return SuccessResult(config.JobHistoryId, summary);
         }
 
         protected virtual CurrentInventoryItem BuildInventoryItem(string alias, string certPem, bool privateKey,
@@ -161,31 +165,29 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
         {
             try
             {
-                _logger.MethodEntry();
-                _logger.LogTrace($"Alias: {alias} Pem: {certPem} PrivateKey: {privateKey}");
+                Logger.MethodEntry();
+                Logger.LogTrace("Alias: {Alias} Pem: {Pem} PrivateKey: {PrivateKey}", alias, certPem, privateKey);
 
-                //1. Look up certificate map entries based on certificate name
                 var certAttributes = GetCertificateAttributes(storePath);
                 var modAlias = alias.Split('/')[5];
-
-                _logger.LogTrace($"Got modAlias: {modAlias}");
+                Logger.LogTrace("Got modAlias: {ModAlias}", modAlias);
 
                 var acsi = new CurrentInventoryItem
                 {
                     Alias = modAlias,
-                    Certificates = new[] {certPem},
+                    Certificates = new[] { certPem },
                     ItemStatus = OrchestratorInventoryItemStatus.Unknown,
                     PrivateKeyEntry = privateKey,
                     UseChainLevel = false,
                     Parameters = certAttributes
                 };
 
-                _logger.MethodExit();
+                Logger.MethodExit();
                 return acsi;
             }
             catch (Exception e)
             {
-                _logger.LogError($"Error Occurred in Inventory.BuildInventoryItem: {LogHandler.FlattenException(e)}");
+                Logger.LogError("Error Occurred in Inventory.BuildInventoryItem: {Error}", LogHandler.FlattenException(e));
                 throw;
             }
         }
@@ -194,22 +196,21 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
         {
             try
             {
-                _logger.MethodEntry();
-                _logger.LogTrace($"Store Path: {storePath}");
+                Logger.MethodEntry();
+                Logger.LogTrace("Store Path: {StorePath}", storePath);
                 var locationName = storePath.Split('/')[3];
 
                 var siteSettingsDict = new Dictionary<string, object>
                 {
-                    {"Location", locationName}
+                    { "Location", locationName }
                 };
 
-                _logger.MethodExit();
+                Logger.MethodExit();
                 return siteSettingsDict;
             }
             catch (Exception e)
             {
-                _logger.LogError(
-                    $"Error Occurred in Inventory.GetCertificateAttributes: {LogHandler.FlattenException(e)}");
+                Logger.LogError("Error Occurred in Inventory.GetCertificateAttributes: {Error}", LogHandler.FlattenException(e));
                 throw;
             }
         }

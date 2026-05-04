@@ -2,7 +2,9 @@
 
 The GCP Certificate Manager Orchestrator Extension remotely manages certificates on the Google Cloud Platform Certificate Manager Product.
 
-This orchestrator extension implements three job types - Inventory, Management Add, and Management Remove. Below are the steps necessary to configure this Orchestrator Extension.  It supports adding certificates with private keys only.  The GCP Certificate Manager Orchestrator Extension supports the replacement of unbound certificates as well as certificates bound to existing map entries, but it does **not** support specifying map entry bindings when adding new certificates.
+This orchestrator extension implements four job types - Inventory, Management Add, Management Remove, and Discovery. Below are the steps necessary to configure this Orchestrator Extension.  It supports adding certificates with private keys only.  The GCP Certificate Manager Orchestrator Extension supports the replacement of unbound certificates as well as certificates bound to existing map entries, but it does **not** support specifying map entry bindings when adding new certificates.
+
+The Discovery job enumerates every GCP project that the orchestrator's service account can see and proposes one candidate store per (project, location) pair. The actual scope of discovery is bounded by IAM - grant the service account the appropriate role at the organization or folder root and Discovery will return everything underneath. See the GCP Certificate Manager store-type page for the operator-facing details.
 
 
 ## Requirements

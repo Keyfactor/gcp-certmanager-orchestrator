@@ -149,6 +149,18 @@ Required APIs to enable in the **service account's home project**:
 - Cloud Resource Manager API
 - Certificate Manager API (also needs to be enabled in every project you actually inventory)
 
+#### Certificate alias rules
+
+GCP Certificate Manager constrains certificate resource IDs to a strict shape:
+
+- 1 to 63 characters
+- Lowercase letters, digits, hyphens only
+- Must start with a lowercase letter
+- Must not end with a hyphen
+- Regex: `[a-z]([-a-z0-9]*[a-z0-9])?`
+
+The orchestrator validates the alias against this rule **before** any API calls or PFX parsing during Management/Add. A non-conforming alias fails fast with a `[FAIL] ValidateAlias` step in the flow trace and a suggestion of a normalized alias (e.g. `Cert1` → `cert1`). Rename the certificate in Keyfactor Command to the suggested form and retry the Management/Add job.
+
 #### Architecture and logging
 
 Every job (Discovery, Inventory, Management) uses a shared `FlowLogger` to record step-by-step progress with timing. The flow summary is appended to `JobResult.FailureMessage` on **both** success and failure paths so operators reading job history can see what happened without having to pull orchestrator-side trace logs. Errors arising from the GCP SDK are unwrapped through `AggregateException` walls and reported with HTTP status + the GCP error response body, so quota errors / IAM denials / malformed certificates surface clearly in Command's UI.

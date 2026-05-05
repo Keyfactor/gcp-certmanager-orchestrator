@@ -30,14 +30,24 @@ v1.2.0 - unreleased
   enumeration that Discovery requires.
 
 ### Known limitations
-- Discovery emits candidate store paths in canonical GCP form; on approval the
-  operator must set the new store's ClientMachine to the project ID and the
-  Location custom property to the region (the canonical path encodes both,
-  but Keyfactor Command does not auto-populate them). This is documented in
-  `docsource/gcpcertmgr.md`.
 - The discovery-job ClientMachine field (Organization ID) is informational; if
   the service account has visibility into multiple organizations, Discovery
   will emit projects from all of them. Constrain at IAM if that's not desired.
+- Discovery does not probe each (project, location) candidate to confirm the
+  Certificate Manager API is enabled or that any certificates exist. Operators
+  can leave `Create Certificate Store If Missing` checked to auto-approve every
+  candidate and let dead-end stores fail their first inventory; or leave it
+  unchecked and approve only the candidates they want to track.
+
+### Changed
+- Inventory and Management now derive the GCP resource path from the store's
+  `StorePath` when it is in canonical `projects/{p}/locations/{l}` form.
+  Discovery emits paths in this form, so Discovery-approved stores now work
+  without operators needing to edit `ClientMachine`/`Location` after approval -
+  whether `Create Certificate Store If Missing` was checked or not. Manually
+  created v1.1-shaped stores (where `StorePath` is `n/a`) keep building the
+  path from `ClientMachine` + the `Location` custom property, so existing
+  stores continue to work unchanged. See `JobBase.ResolveGcpResourcePath`.
 
 v1.1.0
 - Implemented dual build for .net6/8

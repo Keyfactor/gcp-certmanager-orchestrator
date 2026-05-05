@@ -139,5 +139,34 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
             if (s.Length <= maxLen) return s;
             return s.Substring(0, maxLen) + "...";
         }
+
+        /// <summary>
+        /// Resolve the GCP resource path (<c>projects/{projectId}/locations/{location}</c>)
+        /// for a certificate store. When Discovery-approved stores arrive in Command,
+        /// <c>StorePath</c> already carries the canonical GCP path - trust it. For
+        /// manually-created stores (v1.1 shape, where StorePath is "n/a") fall back to
+        /// composing the path from ClientMachine + the Location custom property.
+        /// </summary>
+        /// <remarks>
+        /// This makes Discovery's auto-approval path produce working stores without
+        /// requiring an operator to edit ClientMachine after approval. ClientMachine
+        /// still matters for v1.1-shaped manually-created stores; both paths coexist.
+        /// </remarks>
+        protected static string ResolveGcpResourcePath(string storePath, string projectId, string location)
+        {
+            if (!string.IsNullOrWhiteSpace(storePath))
+            {
+                var trimmed = storePath.Trim();
+                // Reject the historical "n/a" placeholder before pattern-matching.
+                if (!string.Equals(trimmed, "n/a", StringComparison.OrdinalIgnoreCase) &&
+                    trimmed.StartsWith("projects/", StringComparison.OrdinalIgnoreCase) &&
+                    trimmed.IndexOf("/locations/", StringComparison.OrdinalIgnoreCase) > 0)
+                {
+                    return trimmed;
+                }
+            }
+
+            return $"projects/{projectId}/locations/{location}";
+        }
     }
 }

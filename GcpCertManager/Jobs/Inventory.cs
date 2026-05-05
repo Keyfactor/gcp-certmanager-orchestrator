@@ -94,7 +94,10 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
             var sb = new StringBuilder();
             var inventoryItems = new List<CurrentInventoryItem>();
             var nextPageToken = string.Empty;
-            var storePath = $"projects/{storeProperties.ProjectId}/locations/{storeProperties.Location}";
+            var storePath = ResolveGcpResourcePath(
+                config.CertificateStoreDetails.StorePath,
+                storeProperties.ProjectId,
+                storeProperties.Location);
 
             flow.Step("StorePathResolved", $"storePath={storePath}");
 

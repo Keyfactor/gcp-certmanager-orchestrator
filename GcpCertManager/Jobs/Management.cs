@@ -97,7 +97,10 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                 svc = new GcpCertificateManagerClient().GetGoogleCredentials(storeProperties.ServiceAccountKey);
             }, $"source={(string.IsNullOrEmpty(storeProperties.ServiceAccountKey) ? "ADC" : "file")}");
 
-            var storePath = $"projects/{storeProperties.ProjectId}/locations/{storeProperties.Location}";
+            var storePath = ResolveGcpResourcePath(
+                config.CertificateStoreDetails.StorePath,
+                storeProperties.ProjectId,
+                storeProperties.Location);
             CertificateName = config.JobCertificate.Alias;
             flow.Step("StorePathResolved", $"storePath={storePath}, alias={CertificateName}");
 

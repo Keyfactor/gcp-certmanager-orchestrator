@@ -25,14 +25,14 @@ The service account needs at minimum the `resourcemanager.projects.list` permiss
 
 #### Approving discovered stores
 
-Discovered store paths arrive in Keyfactor Command in the form `projects/{projectId}/locations/{location}`. **Command does not auto-populate `ClientMachine` or the `Location` custom property from the discovered path** - the operator must edit each candidate before approving:
+Discovered store paths arrive in Keyfactor Command in the form `projects/{projectId}/locations/{location}`. As of v1.2.0 the inventory and management jobs read the GCP resource path **from `StorePath` when it is in this canonical form**, so Discovery-approved stores work end-to-end without operators having to retype the project ID into `ClientMachine` after approval. The only field that still needs a value is the **Service Account Key File Path** custom property:
 
-1. Set **Client Machine** on the new store to the project ID (e.g. `my-pki-project`).
-2. Set the **Location** custom property to the region (e.g. `global`).
-3. Set the **Service Account Key File Path** custom property to the JSON key filename (or leave blank to use Application Default Credentials).
-4. Approve.
+1. (Optional) Set the **Service Account Key File Path** to the JSON key filename in the orchestrator extension directory. Leave blank to use Application Default Credentials.
+2. Approve.
 
-After approval the store is treated like any other manually-created `GcpCertMgr` store - the inventory job will run against it on its configured schedule.
+`ClientMachine` and the `Location` custom property are still respected for **manually-created** stores (where `StorePath` is left as `n/a`) - that's the v1.1 shape and continues to work unchanged. For Discovery-approved stores those fields are advisory only; the canonical `StorePath` wins.
+
+After approval the store is treated like any other `GcpCertMgr` store - the inventory job will run against it on its configured schedule.
 
 ### Architecture and logging
 

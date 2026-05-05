@@ -86,10 +86,46 @@ That single value carries both the GCP project and the location (region or `glob
 
 | Field | What it carries | Read by |
 |---|---|---|
-| **Store Path** | Canonical GCP resource path: `projects/{projectId}/locations/{location}` | Inventory, Management, Discovery (emit) |
+| **Store Path** | Canonical GCP resource path: `projects/{projectId}/locations/{location}`. The `{location}` segment is the GCP region (or `global`) the store targets - this is the only place the orchestrator actually reads the location from for new stores. | Inventory, Management, Discovery (emit) |
 | **Client Machine** | Display label only. Recommended: GCP Organization ID (e.g. `1005564431893`). Not parsed. | UI grouping in Command |
 | **Service Account Key File Path** (custom, *deprecated*) | v1.1 shape only. Leave blank for new stores - authentication uses Application Default Credentials. | Credential loader fallback; emits a deprecation warning when read |
 | **Location** (custom, *deprecated*) | v1.1 shape only. New stores leave it blank. Used as a fallback when Store Path is empty or `n/a`. | v1.1 fallback path; emits a deprecation warning when read |
+
+##### Location semantics: where the GCP region lives
+
+GCP region names (`global`, `us-central1`, `europe-west1`, ...) appear in three distinct places across the orchestrator. They look related but they are **not interchangeable**, and only one of them is load-bearing for new stores. Operators who only skim the field semantics table often miss this and end up confused about which Location field to set where.
+
+| # | Where it appears | What it is | What reads it |
+|---|---|---|---|
+| 1 | **The `{location}` segment of `Store Path`** (e.g. the `global` in `projects/edgecerts/locations/global`) | The actual GCP region the store targets. Source of truth. | Inventory and Management both call `JobBase.ResolveGcpResourcePath` which returns Store Path verbatim when it matches the canonical form. The location segment is parsed back out (string split) when the Inventory job needs to populate the `Location` parameter on each returned certificate. |
+| 2 | **The `Location` custom store property** | A v1.1-shape field. New stores leave it blank. | Only the v1.1 fallback path inside `JobBase.ResolveGcpResourcePath` - it builds `projects/{ClientMachine}/locations/{Location}` when Store Path is blank or `n/a`, and emits a `LogWarning` each time naming the migration step. Removal scheduled for v2.0. |
+| 3 | **The Discovery job's "Directories to search" form field** | Operator INPUT to the discovery job. A comma-separated list of regions to enumerate, e.g. `global,us-central1,europe-west1`. | `Discovery.ResolveLocations` parses the list. Discovery then emits one candidate store path per `(project × location)` combination, where the location segment of each emitted Store Path comes from this list. The list itself does **not** propagate to the resulting stores - it has no afterlife once Discovery has emitted candidates. |
+
+###### How the three relate
+
+For a **v1.2 store created via Discovery**:
+
+1. Operator types `global,us-central1` into the discovery job's "Directories to search" - this is place #3.
+2. Discovery emits `projects/edgecerts/locations/global` and `projects/edgecerts/locations/us-central1`. Each emitted string is consumed as place #1 (Store Path) when the candidate is approved.
+3. The auto-created store has Store Path populated; the **Location custom property is blank** and unused. Place #2 has no role.
+4. Inventory reads Store Path (place #1) for the GCP API path, and parses the location segment back out for the `Location` parameter on each cert item.
+5. Discovery's "Directories to search" value (place #3) is gone - it never landed on the store.
+
+For a **v1.2 store created manually**:
+
+- Type the full canonical path into Store Path (place #1) - e.g. `projects/edgecerts/locations/global`.
+- Leave the Location custom property (place #2) blank.
+
+For a **v1.1 store mid-migration**:
+
+- Store Path is blank or `n/a`; the orchestrator falls back to building the GCP path from `Client Machine` + `Location` (place #2). A deprecation warning is logged every job run. Migrate by populating Store Path (place #1) and clearing place #2.
+
+###### Quick reference
+
+- "Where do I tell the orchestrator which GCP region to use for *this store*?" → **the `{location}` segment of Store Path** (place #1).
+- "Where do I tell Discovery which regions to enumerate across *the whole org*?" → **Directories to search** on the discovery job (place #3).
+- "What's the Location custom field for?" → Nothing, unless you're maintaining a v1.1 store and haven't migrated yet (place #2).
+- "Why does the inventory result still have a `Location` parameter on each certificate?" → That's parsed out of Store Path's location segment for downstream filtering in Command. It mirrors place #1, not place #2.
 
 ##### Manually creating a store
 
@@ -210,7 +246,7 @@ Under the v1.1 model that meant every Discovery-approved store ended up with the
 | Remove       | ✅ Checked     |
 | Discovery    | ✅ Checked  |
 | Reenrollment | 🔲 Unchecked |
-| Create       | ✅ Checked     |
+| Create       | 🔲 Unchecked     |
 
 #### Store Type Creation
 
@@ -253,7 +289,7 @@ the Keyfactor Command Portal
    | Supports Remove | ✅ Checked | Check the box. Indicates that the Store Type supports Management Remove |
    | Supports Discovery | ✅ Checked | Check the box. Indicates that the Store Type supports Discovery |
    | Supports Reenrollment | 🔲 Unchecked |  Indicates that the Store Type supports Reenrollment |
-   | Supports Create | ✅ Checked | Check the box. Indicates that the Store Type supports store creation |
+   | Supports Create | 🔲 Unchecked |  Indicates that the Store Type supports store creation |
    | Needs Server | 🔲 Unchecked | Determines if a target server name is required when creating store |
    | Blueprint Allowed | 🔲 Unchecked | Determines if store type may be included in an Orchestrator blueprint |
    | Uses PowerShell | 🔲 Unchecked | Determines if underlying implementation is PowerShell |

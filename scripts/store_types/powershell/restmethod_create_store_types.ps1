@@ -78,7 +78,7 @@ New-StoreType "GcpCertMgr" @'
   "StorePathValue": "",
   "SupportedOperations": {
     "Add": true,
-    "Create": true,
+    "Create": false,
     "Discovery": true,
     "Enrollment": false,
     "Remove": true

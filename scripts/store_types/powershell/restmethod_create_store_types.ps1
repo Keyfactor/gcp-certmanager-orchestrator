@@ -62,7 +62,7 @@ function New-StoreType {
 }
 
 # ---------------------------------------------------------------------------
-# GcpCertMgr — GCP Project ID for your account.
+# GcpCertMgr — Display label for grouping certificate stores in Keyfactor Command. Recommended value is the GCP Organization ID (e.g. `1005564431893`); the orchestrator does not parse a project ID out of this field. The actual GCP project + location are read from Store Path.
 # ---------------------------------------------------------------------------
 New-StoreType "GcpCertMgr" @'
 {
@@ -75,7 +75,7 @@ New-StoreType "GcpCertMgr" @'
   "PowerShell": false,
   "PrivateKeyAllowed": "Required",
   "StorePathType": "",
-  "StorePathValue": "n/a",
+  "StorePathValue": "",
   "SupportedOperations": {
     "Add": true,
     "Create": true,
@@ -91,16 +91,16 @@ New-StoreType "GcpCertMgr" @'
   "Properties": [
     {
       "Name": "Location",
-      "DisplayName": "Location",
+      "DisplayName": "Location (deprecated)",
       "Type": "String",
       "DependsOn": "",
-      "DefaultValue": "global",
-      "Required": true,
+      "DefaultValue": "",
+      "Required": false,
       "IsPAMEligible": false
     },
     {
       "Name": "ServiceAccountKey",
-      "DisplayName": "Service Account Key File Path",
+      "DisplayName": "Service Account Key File Path (deprecated)",
       "Type": "String",
       "DependsOn": "",
       "DefaultValue": "",
@@ -108,7 +108,7 @@ New-StoreType "GcpCertMgr" @'
       "IsPAMEligible": false
     }
   ],
-  "StorePathDescription": "This is not used and should be defaulted to n/a per the certificate store type set up.",
+  "StorePathDescription": "Canonical GCP resource path in the form `projects/{projectId}/locations/{location}` (e.g. `projects/edgecerts/locations/global`). This is the single source of truth for which Certificate Manager instance the store targets. For Discovery-approved stores Keyfactor Command auto-fills this from the discovered candidate; for manually-created stores the operator types it directly.",
   "EntryParameters": []
 }
 '@

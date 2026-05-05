@@ -107,7 +107,7 @@ create_store_type "GcpCertMgr" '{
     },
     {
       "Name": "ServiceAccountKey",
-      "DisplayName": "Service Account Key File Path",
+      "DisplayName": "Service Account Key File Path (deprecated)",
       "Type": "String",
       "DependsOn": "",
       "DefaultValue": "",

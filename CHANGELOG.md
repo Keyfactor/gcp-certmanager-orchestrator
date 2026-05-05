@@ -8,11 +8,10 @@ v1.2.0 - unreleased
     IAM bindings (the customer scopes that at the org root).
   - "Directories to search" is repurposed as a comma-separated list of GCP
     locations (regions); defaults to `global` when blank.
-  - Service account credentials default to Application Default Credentials,
-    matching the recommended deployment on a GCE VM / GKE pod with workload
-    identity. An optional `ServiceAccountKey` JobProperty (file name relative
-    to the orchestrator extension dir) is supported for parity with the
-    inventory/management job configuration.
+  - Service account credentials use Application Default Credentials, matching
+    the recommended deployment on a GCE VM / GKE pod with workload identity,
+    or the `GOOGLE_APPLICATION_CREDENTIALS` environment variable on the
+    orchestrator host when running outside GCP.
 - Added `FlowLogger` and `JobBase` infrastructure shared across all three jobs
   (Inventory, Management, Discovery). FlowLogger captures step-by-step traces
   with timing, and the summary is appended to `JobResult.FailureMessage` on
@@ -55,6 +54,32 @@ v1.2.0 - unreleased
   the value is parsed out of Store Path. The field remains in the manifest
   with `Required: false` and a deprecation note so existing v1.1 stores keep
   rendering correctly in Command's UI.
+
+### Changed (authentication)
+- Authentication consolidates around Application Default Credentials (ADC).
+  This is the only credential mechanism that works uniformly across all four
+  job types - the previous `Service Account Key File Path` custom store
+  property was readable only by Inventory/Management because the Keyfactor
+  Command discovery-job UI does not surface store-type custom properties.
+  ADC works whether the orchestrator runs inside GCP (via workload identity
+  / GCE metadata server) or outside GCP (via the
+  `GOOGLE_APPLICATION_CREDENTIALS` environment variable on the orchestrator
+  host).
+- The `Service Account Key File Path` (`ServiceAccountKey`) custom store
+  property is deprecated. New stores leave it blank. v1.1 stores that have
+  it populated continue to work via a deprecation-logged fallback in
+  `GcpCertificateManagerClient.LoadCredentials`. Removal is scheduled for
+  v2.0.
+
+### Removed (docs)
+- Removed three Google Cloud Console screenshot GIFs from `docsource/` that
+  documented the service-account creation, API enablement, and JSON-key
+  download flows: `ServiceAccountSettings.gif`, `ApiAccessNeeded.gif`,
+  `GoogleKeyJsonDownload.gif`. Replaced with verbal step-by-step
+  instructions and `gcloud` commands in `docsource/content.md` so the docs
+  do not go stale when Google redesigns the Console UI. The Keyfactor
+  Command store-type dialog screenshots in `docsource/images/` are
+  doctool-managed and remain.
 
 ### Added (validation)
 - Pre-flight alias validation in Management/Add. The orchestrator now checks

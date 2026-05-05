@@ -58,10 +58,23 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Client
 
         private static GoogleCredential LoadCredentials(string credentialFileName, ILogger logger)
         {
-            //Credentials file needs to be in the same location of the executing assembly
+            // Credential resolution order:
+            //   1. Explicit ServiceAccountKey (file in the extension dir) - DEPRECATED in v1.2
+            //   2. Application Default Credentials (GOOGLE_APPLICATION_CREDENTIALS env var,
+            //      or GCE VM / GKE pod metadata server when running inside GCP)
+            //
+            // ADC is the canonical path because the Keyfactor discovery-job UI does not
+            // surface the per-store ServiceAccountKey custom property, so file-based auth
+            // can't be configured uniformly across all four job types.
             if (!string.IsNullOrEmpty(credentialFileName))
             {
-                logger.LogDebug("Has credential file name");
+                logger.LogWarning(
+                    "The ServiceAccountKey store property ('{FileName}') is deprecated as of v1.2 and will be removed in v2.0. " +
+                    "Switch to Application Default Credentials by setting GOOGLE_APPLICATION_CREDENTIALS as a machine-level " +
+                    "environment variable on the orchestrator host (or by running the orchestrator on a GCE VM / GKE pod with " +
+                    "workload identity), then clear this store property.",
+                    credentialFileName);
+
                 var strExeFilePath = Assembly.GetExecutingAssembly().Location;
                 var strWorkPath = Path.GetDirectoryName(strExeFilePath);
                 var strSettingsJsonFilePath = Path.Combine(strWorkPath ?? string.Empty, credentialFileName);
@@ -72,7 +85,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Client
                 }
             }
 
-            logger.LogDebug("No credential file name");
+            logger.LogDebug("Using Application Default Credentials");
             return GoogleCredential.GetApplicationDefaultAsync().Result;
         }
 

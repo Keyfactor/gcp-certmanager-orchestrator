@@ -51,13 +51,13 @@
                         },
                         {
                             "Name": "ServiceAccountKey",
-                            "DisplayName": "Service Account Key File Path",
+                            "DisplayName": "Service Account Key File Path (deprecated)",
                             "Type": "String",
                             "DependsOn": "",
                             "DefaultValue": "",
                             "Required": false,
                             "IsPAMEligible": false,
-                            "Description": "File name of the Google Cloud service account key (JSON) installed in the same folder as the orchestrator extension (e.g. `kf-orchestrator.json`). Leave blank to fall back to Application Default Credentials (typical when the orchestrator runs on a GCE VM / GKE pod with workload identity, or when `GOOGLE_APPLICATION_CREDENTIALS` is set as an environment variable on the orchestrator host)."
+                            "Description": "**Deprecated in v1.2.** Leave blank. Authenticate via Application Default Credentials instead (set `GOOGLE_APPLICATION_CREDENTIALS` as a machine-level environment variable on the orchestrator host pointing at the JSON key, or run on a GCE VM / GKE pod with workload identity). The Discovery job has no way to surface this custom property in Keyfactor Command's discovery-job UI, so ADC is the only mechanism that works uniformly across all four job types. v1.1 stores that have this populated continue to work via a deprecation-logged fallback; the field is scheduled for removal in v2.0."
                         }
                     ],
                     "ClientMachineDescription": "Display label for grouping certificate stores in Keyfactor Command. Recommended value is the GCP Organization ID (e.g. `1005564431893`); the orchestrator does not parse a project ID out of this field. The actual GCP project + location are read from Store Path.",

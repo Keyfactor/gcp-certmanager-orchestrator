@@ -32,11 +32,6 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
         // exact casing has shifted across Command versions.
         private static readonly string[] DirsToSearchKeys = { "dirs", "Dirs", "directories", "Directories", "DirsToSearch" };
 
-        // Optional override: path to a service account JSON file installed alongside
-        // the orchestrator extension. When omitted, GoogleCredential.ApplicationDefault
-        // is used - which is the recommended path when the orchestrator runs on a GCE
-        // VM / GKE pod with a workload-identity-bound service account.
-        private const string ServiceAccountKeyProperty = "ServiceAccountKey";
 
         public Discovery(IPAMSecretResolver resolver) : base(resolver)
         {
@@ -91,26 +86,19 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
             var orgIdHint = (config.ClientMachine ?? string.Empty).Trim();
             flow.Step("ParseConfig", $"orgIdHint={(string.IsNullOrEmpty(orgIdHint) ? "<none>" : orgIdHint)}");
 
-            string serviceAccountKey = null;
-            flow.Step("ResolveServiceAccountKey", () =>
-            {
-                if (config.JobProperties != null &&
-                    config.JobProperties.TryGetValue(ServiceAccountKeyProperty, out var raw))
-                {
-                    var s = raw?.ToString();
-                    if (!string.IsNullOrWhiteSpace(s)) serviceAccountKey = s.Trim();
-                }
-            }, $"source={(serviceAccountKey == null ? "ADC" : "JobProperties")}");
-
             var (locations, locationSource) = ResolveLocations(config);
             flow.Step("ResolveLocations",
                 $"source={locationSource}, locations=[{string.Join(",", locations)}]");
 
+            // Authentication uses Application Default Credentials. The Keyfactor Command
+            // discovery-job UI does not surface store-type custom properties, so the
+            // file-based ServiceAccountKey custom property used by Inventory/Management
+            // (deprecated as of v1.2) was never reachable here in the first place.
             CloudResourceManagerService crm = null;
             flow.Step("CreateApiClient", () =>
             {
-                crm = new GcpCertificateManagerClient().GetCloudResourceManager(serviceAccountKey);
-            });
+                crm = new GcpCertificateManagerClient().GetCloudResourceManager(null);
+            }, "source=ADC");
 
             List<Project> projects = null;
             flow.Step("ListProjects", () =>

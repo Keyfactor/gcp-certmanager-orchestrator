@@ -18,7 +18,7 @@ That single value carries both the GCP project and the location (region or `glob
 |---|---|---|
 | **Store Path** | Canonical GCP resource path: `projects/{projectId}/locations/{location}` | Inventory, Management, Discovery (emit) |
 | **Client Machine** | Display label only. Recommended: GCP Organization ID (e.g. `1005564431893`). Not parsed. | UI grouping in Command |
-| **Service Account Key File Path** (custom) | Filename of the JSON key in the orchestrator extension directory. Blank → Application Default Credentials. | Credential loader |
+| **Service Account Key File Path** (custom, *deprecated*) | v1.1 shape only. Leave blank for new stores - authentication uses Application Default Credentials. | Credential loader fallback; emits a deprecation warning when read |
 | **Location** (custom, *deprecated*) | v1.1 shape only. New stores leave it blank. Used as a fallback when Store Path is empty or `n/a`. | v1.1 fallback path; emits a deprecation warning when read |
 
 #### Manually creating a store
@@ -27,14 +27,14 @@ Set:
 
 - **Client Machine**: GCP Organization ID
 - **Store Path**: `projects/{projectId}/locations/{location}` - e.g. `projects/edgecerts/locations/global`
-- **Service Account Key File Path**: `kf-orchestrator.json` (or blank for ADC)
+- **Service Account Key File Path**: leave blank (deprecated; ADC is used)
 - **Location**: leave blank
+
+Authentication uses Application Default Credentials - see "Service account credentials" below.
 
 #### Approving a Discovery-discovered store
 
-Discovery emits one candidate per (project, location) pair in canonical form, so the only field you might want to set on approval is **Service Account Key File Path** (recommended: type the JSON filename for explicit control; leave blank to inherit ADC). Click SAVE without further edits.
-
-If `Create Certificate Store If Missing` is checked on the discovery job, every candidate auto-approves with no operator review. Discovery sets Store Path correctly on each, so all auto-created stores are immediately usable.
+Discovery emits one candidate per (project, location) pair in canonical form, so no edits are required on approval - just click SAVE. If `Create Certificate Store If Missing` is checked on the discovery job, every candidate auto-approves with no operator review. Discovery sets Store Path correctly on each, so all auto-created stores are immediately usable.
 
 ### Discovery job configuration
 
@@ -50,10 +50,12 @@ The candidate count is `projects × locations`, so be deliberate about how many 
 
 #### Service account credentials
 
-Both the discovery job and the inventory/management jobs resolve credentials in the same order:
+The orchestrator authenticates exclusively via Application Default Credentials. Two supported deployment modes:
 
-1. If a `ServiceAccountKey` value is configured (custom store property for inventory/management; not exposed in the discovery-job UI - see env-var fallback below), the JSON key file with that name is read from the orchestrator extension directory.
-2. Otherwise, `GoogleCredential.GetApplicationDefault()` is used. On Windows hosts this means setting `GOOGLE_APPLICATION_CREDENTIALS` as a machine-level environment variable to the absolute path of the JSON key, then restarting the Keyfactor Orchestrator service. On a GCE VM / GKE pod with workload identity, ADC works automatically.
+- **Inside GCP** - on a GCE VM or GKE pod with the service account attached via workload identity. ADC discovers the service account from the metadata server automatically. No host configuration needed.
+- **Outside GCP** - on a Windows host or on-prem Linux. Set the `GOOGLE_APPLICATION_CREDENTIALS` machine-level environment variable to the absolute path of the service account's JSON key, then restart the Keyfactor Orchestrator service so it picks up the variable. The account that runs the orchestrator service must have read access to the JSON key file.
+
+The legacy `Service Account Key File Path` custom store property (a JSON filename relative to the orchestrator extension directory) is **deprecated as of v1.2** because the Discovery job has no way to surface custom store properties in Keyfactor Command's discovery-job UI - so file-based auth can't be configured uniformly across all four job types. v1.1 stores with the property populated continue to work, but every job run logs a deprecation warning. The field is scheduled for removal in v2.0; new stores should leave it blank.
 
 The service account needs at minimum:
 
@@ -84,14 +86,15 @@ Every job (Discovery, Inventory, Management) uses a shared `FlowLogger` to recor
 
 ### Migrating v1.1 stores
 
-A v1.1-shape store has `Store Path` empty or `n/a`, `Client Machine` set to the GCP Project ID, and the `Location` custom property set to the region. These continue to work in v1.2 through a fallback path, but every inventory/management run logs a deprecation warning naming the store. To migrate, edit each affected store:
+A v1.1-shape store has `Store Path` empty or `n/a`, `Client Machine` set to the GCP Project ID, the `Location` custom property set to the region, and possibly the `Service Account Key File Path` custom property pointing at a JSON key in the orchestrator extension directory. These continue to work in v1.2 through fallback paths, but every inventory/management run logs deprecation warnings naming the store. To migrate, edit each affected store:
 
 1. Set **Store Path** to `projects/{the-current-Client-Machine-value}/locations/{the-current-Location-value}`.
 2. Optionally change **Client Machine** to the GCP Organization ID for cleaner UI grouping.
 3. Optionally clear the **Location** field (no longer required).
-4. Save.
+4. Configure ADC on the orchestrator host (see "Service account credentials") and clear the **Service Account Key File Path** field.
+5. Save.
 
-The deprecation warning will stop on the next job run once Store Path is populated. The fallback will be removed in v2.0.
+The deprecation warnings will stop on the next job run once the store is fully migrated. Both fallbacks will be removed in v2.0.
 
 ### Design rationale: why Store Path is the source of truth
 
@@ -118,6 +121,7 @@ Under the v1.1 model that meant every Discovery-approved store ended up with the
 
 - **Client Machine is now a display label**, not load-bearing. Some other Keyfactor orchestrators use Client Machine as a literal target host; for GCP that does not fit, because the orchestrator talks to a single GCP API endpoint regardless of which project a store targets - there is no per-store host to put there. The recommended value (GCP Organization ID) at least groups GCP stores together usefully in Command's UI.
 - **The Location custom property is deprecated, not removed**. Keeping it in the manifest with `Required: false` preserves v1.1 stores' UI rendering during the transition. The fallback path in `JobBase.ResolveGcpResourcePath` reads it for v1.1-shaped stores (Store Path blank or `n/a`) and emits a `LogWarning` each time naming the migration step. Removal is scheduled for v2.0.
+- **The Service Account Key File Path custom property is deprecated, not removed**, for the same backwards-compatibility reason. Authentication consolidates around Application Default Credentials, the GCP-recommended pattern, which works uniformly across all four job types - the deprecated property only ever worked for Inventory/Management because Discovery's UI doesn't expose store-type custom properties. Removal is scheduled for v2.0.
 
 ### Vendor docs
 

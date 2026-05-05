@@ -8,6 +8,7 @@ using System.IO;
 using System.Reflection;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.CertificateManager.v1;
+using Google.Apis.CloudResourceManager.v3;
 using Google.Apis.Services;
 using Google.Apis.Iam.v1;
 using Google.Apis.Iam.v1.Data;
@@ -26,27 +27,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Client
         {
             ILogger _logger = LogHandler.GetClassLogger<CertificateManagerService>();
 
-            //Credentials file needs to be in the same location of the executing assembly
-            GoogleCredential credentials;
-
-            if (!string.IsNullOrEmpty(credentialFileName))
-            {
-                _logger.LogDebug("Has credential file name");
-                var strExeFilePath = Assembly.GetExecutingAssembly().Location;
-                var strWorkPath = Path.GetDirectoryName(strExeFilePath);
-                var strSettingsJsonFilePath = Path.Combine(strWorkPath ?? string.Empty, credentialFileName);
-
-                var stream = new FileStream(strSettingsJsonFilePath,
-                    FileMode.Open
-                );
-
-                credentials = GoogleCredential.FromStream(stream);
-            }
-            else
-            {
-                _logger.LogDebug("No credential file name");
-                credentials = GoogleCredential.GetApplicationDefaultAsync().Result;
-            }
+            var credentials = LoadCredentials(credentialFileName, _logger);
 
             var service = new CertificateManagerService(new BaseClientService.Initializer
             {
@@ -54,6 +35,45 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Client
             });
 
             return service;
+        }
+
+        public CloudResourceManagerService GetCloudResourceManager(string credentialFileName)
+        {
+            ILogger _logger = LogHandler.GetClassLogger<CloudResourceManagerService>();
+
+            // CloudResourceManager.search requires the cloud-platform scope when using ADC
+            // from a Compute Engine / GKE service account; FromStream credentials carry
+            // their own scopes from the JSON key.
+            var credentials = LoadCredentials(credentialFileName, _logger);
+            if (credentials.IsCreateScopedRequired)
+                credentials = credentials.CreateScoped(CloudResourceManagerService.Scope.CloudPlatformReadOnly);
+
+            var service = new CloudResourceManagerService(new BaseClientService.Initializer
+            {
+                HttpClientInitializer = credentials
+            });
+
+            return service;
+        }
+
+        private static GoogleCredential LoadCredentials(string credentialFileName, ILogger logger)
+        {
+            //Credentials file needs to be in the same location of the executing assembly
+            if (!string.IsNullOrEmpty(credentialFileName))
+            {
+                logger.LogDebug("Has credential file name");
+                var strExeFilePath = Assembly.GetExecutingAssembly().Location;
+                var strWorkPath = Path.GetDirectoryName(strExeFilePath);
+                var strSettingsJsonFilePath = Path.Combine(strWorkPath ?? string.Empty, credentialFileName);
+
+                using (var stream = new FileStream(strSettingsJsonFilePath, FileMode.Open))
+                {
+                    return GoogleCredential.FromStream(stream);
+                }
+            }
+
+            logger.LogDebug("No credential file name");
+            return GoogleCredential.GetApplicationDefaultAsync().Result;
         }
 
         public ServiceAccountKey CreateServiceAccountKey(string serviceAccountEmail)

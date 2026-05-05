@@ -53,6 +53,15 @@ v1.2.0 - unreleased
   with `Required: false` and a deprecation note so existing v1.1 stores keep
   rendering correctly in Command's UI.
 
+### Added (validation)
+- Pre-flight alias validation in Management/Add. The orchestrator now checks
+  the certificate alias against GCP Certificate Manager's resource-ID rule
+  (`[a-z]([-a-z0-9]*[a-z0-9])?`, max 63 chars) before doing any API work or
+  PFX parsing. A non-conforming alias produces a clear `[FAIL] ValidateAlias`
+  flow step with a suggested normalized form (e.g. `Cert1` → `cert1`),
+  replacing the previous behavior of failing 700ms later with a wall-of-JSON
+  HTTP 400 from GCP. See `JobBase.ValidateGcpCertificateId`.
+
 ### Backwards compatibility
 - v1.1-shape stores (Store Path blank or `n/a`, Client Machine = Project ID,
   Location custom property = region) continue to work via a deprecation-logged

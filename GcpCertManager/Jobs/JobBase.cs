@@ -13,6 +13,7 @@
 // limitations under the License.
 
 using System;
+using System.Text.RegularExpressions;
 using Google;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
@@ -173,6 +174,60 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                 projectId, location, projectId, location);
 
             return $"projects/{projectId}/locations/{location}";
+        }
+
+        // GCP Certificate Manager certificate IDs must match Google's resource-id rule:
+        //   [a-z]([-a-z0-9]*[a-z0-9])?    length 1..63
+        // i.e. lowercase letter first, lowercase letters/digits/hyphens after, must not
+        // end with a hyphen. The API rejects anything else with HTTP 400 INVALID_ARGUMENT.
+        // Source: https://cloud.google.com/certificate-manager/docs/reference/rest/v1/projects.locations.certificates/create#path-parameters
+        private static readonly Regex GcpCertificateIdPattern = new Regex(
+            @"^[a-z]([-a-z0-9]{0,61}[a-z0-9])?$",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+        /// <summary>
+        /// Throws <see cref="ArgumentException"/> when <paramref name="alias"/> is not a
+        /// legal GCP Certificate Manager resource ID. Call this before doing any
+        /// expensive PFX parsing or API work so the operator sees a clear error in the
+        /// flow trace instead of a 400 wall-of-JSON from GCP.
+        /// </summary>
+        protected static void ValidateGcpCertificateId(string alias)
+        {
+            if (string.IsNullOrWhiteSpace(alias))
+                throw new ArgumentException("Certificate alias is required.", nameof(alias));
+
+            if (alias.Length > 63)
+                throw new ArgumentException(
+                    $"GCP Certificate Manager requires the alias to be 63 characters or fewer; got '{alias}' ({alias.Length} chars).",
+                    nameof(alias));
+
+            if (!GcpCertificateIdPattern.IsMatch(alias))
+            {
+                var suggestion = SuggestValidAlias(alias);
+                throw new ArgumentException(
+                    $"GCP Certificate Manager rejects the alias '{alias}'. Aliases must match [a-z]([-a-z0-9]*[a-z0-9])? - " +
+                    $"start with a lowercase letter, contain only lowercase letters/digits/hyphens, and not end with a hyphen. " +
+                    $"Try renaming the certificate in Keyfactor Command to '{suggestion}' and retry.",
+                    nameof(alias));
+            }
+        }
+
+        private static string SuggestValidAlias(string alias)
+        {
+            if (string.IsNullOrEmpty(alias)) return "cert";
+            // Best-effort lowercase + replace illegal chars with '-' + trim leading non-letters and trailing hyphens.
+            var lowered = alias.ToLowerInvariant();
+            var chars = new System.Text.StringBuilder(lowered.Length);
+            foreach (var c in lowered)
+            {
+                if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-') chars.Append(c);
+                else chars.Append('-');
+            }
+            var s = chars.ToString().Trim('-');
+            // Resource IDs must start with a letter.
+            while (s.Length > 0 && !(s[0] >= 'a' && s[0] <= 'z')) s = s.Substring(1);
+            if (s.Length == 0) return "cert";
+            return s.Length > 63 ? s.Substring(0, 63).TrimEnd('-') : s;
         }
     }
 }

@@ -131,6 +131,12 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
         private JobResult PerformAddition(CertificateManagerService svc, ManagementJobConfiguration config,
             string storePath, FlowLogger flow)
         {
+            // Validate the alias before any API calls or PFX parsing - GCP rejects
+            // non-conforming IDs with HTTP 400 after we've already done the expensive
+            // work, so failing fast saves both time and a confusing error message.
+            flow.Step("ValidateAlias", () => ValidateGcpCertificateId(CertificateName),
+                $"alias={CertificateName}");
+
             var duplicate = false;
             flow.Step("CheckForDuplicate", () => duplicate = CheckForDuplicate(storePath, CertificateName, svc),
                 $"alias={CertificateName}");

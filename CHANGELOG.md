@@ -7,7 +7,10 @@ v1.2.0 - unreleased
     logging only; the actual project set is bounded by the service account's
     IAM bindings (the customer scopes that at the org root).
   - "Directories to search" is repurposed as a comma-separated list of GCP
-    locations (regions); defaults to `global` when blank.
+    locations (regions). The Keyfactor Command UI requires this field be
+    non-empty; the recommended value is just `global`. The orchestrator also
+    falls back to `global` defensively if it ever receives a blank value via
+    a non-UI submission path.
   - Service account credentials use Application Default Credentials, matching
     the recommended deployment on a GCE VM / GKE pod with workload identity,
     or the `GOOGLE_APPLICATION_CREDENTIALS` environment variable on the

@@ -79,10 +79,22 @@ Discovery is configured against the GCP Certificate Manager store type and enume
 | Field on the discovery-job form | What to put |
 |---|---|
 | **Client Machine** | The GCP Organization ID (e.g. `1005564431893`). Logged for traceability; not used as a query filter. |
-| **Server Username / Server Password** | Not used. Leave blank - GCP authentication uses a service account, not username/password. |
-| **Directories to search** | Comma-separated list of GCP locations (regions) to enumerate, e.g. `global,us-central1,europe-west1`. Leave blank to default to `global`. |
+| **Server Username / Server Password** | Not used, but the form may require non-empty values. Type any placeholder (e.g. `unused` / `unused`). The orchestrator never reads them - GCP authentication uses Application Default Credentials, not username/password. |
+| **Directories to search** | Required by the Command UI. **Type `global`** for the default behavior of searching only GCP's global Certificate Manager location, which is what almost every operator wants. See "Should I ever put something other than `global`?" below for the rare exceptions. |
 
-The candidate count is `projects × locations`, so be deliberate about how many regions you list - listing 8 regions for an org with 100 projects yields 800 candidate stores, most of which will be empty.
+> **Why is the field labeled "Directories to search" if it accepts GCP regions?** Keyfactor Command's standard Discovery UI was designed for filesystem-based store types (Java keystores, PEM files in directories) where a comma-separated directory list is the natural input. The field label is hard-coded by Command and not something the orchestrator can change. For our purposes, treat it as "GCP locations to enumerate" - the orchestrator parses the value as a list of GCP region names.
+
+#### Should I ever put something other than `global`?
+
+Almost never. Concrete guidance:
+
+- **Just type `global` → searches the `global` GCP location only.** This is the right answer for the vast majority of GCP Certificate Manager deployments, because certificates attached to GCP's *global* external Application Load Balancer (the most common load balancer in GCP) are stored in the `global` Certificate Manager location.
+- **Add specific regions** (e.g. `global,us-central1,europe-west1`) only if your organization runs **regional** external Application Load Balancers, or has data-residency requirements that pin certificates to specific regions. If you're not sure whether that describes your environment, the answer is "you don't need this" and you should just type `global`.
+- **Don't list every GCP region** (`us-central1,us-east1,...`). Discovery does not probe candidates - it emits one (project × location) pair regardless of whether that combination has any certs. Listing 40 regions for a 100-project org produces 4,000 candidate stores, most empty, all cluttering Command's certificate store list.
+
+The format is a comma-separated list of GCP location names exactly as GCP names them. `global` is the universal location; regional names follow GCP's standard `<area>-<region><number>` form (e.g. `us-central1`, `europe-west1`, `asia-southeast1`). See the [Certificate Manager supported locations list](https://cloud.google.com/certificate-manager/docs/locations) for the canonical set.
+
+The candidate count is always `projects × locations`, so each region you add multiplies the size of the discovery result by the number of accessible projects.
 
 #### Service account credentials
 

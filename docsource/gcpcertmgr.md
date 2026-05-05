@@ -70,19 +70,39 @@ Authentication uses Application Default Credentials - see "Service account crede
 
 #### Approving a Discovery-discovered store
 
-Discovery emits one candidate per (project, location) pair in canonical form, so no edits are required on approval - just click SAVE. If `Create Certificate Store If Missing` is checked on the discovery job, every candidate auto-approves with no operator review. Discovery sets Store Path correctly on each, so all auto-created stores are immediately usable.
+After the discovery job runs, candidates appear in **Locations → Certificate Stores → Discover** (a new tab next to "Certificate Stores"). Tick the candidates you want to track, click **MANAGE**, and Command opens the per-candidate edit dialog. The relevant fields:
+
+| Field | Action |
+|---|---|
+| **Client Machine** | Pre-filled by Command (often the orchestrator hostname). Display label only - the orchestrator does not parse it. Leave as-is, or change to the GCP Organization ID for cleaner UI grouping. |
+| **Store Path** | Pre-filled with the canonical GCP path Discovery emitted (e.g. `projects/edgecerts/locations/global`). **Don't edit** - this is what Inventory and Management read. |
+| **Application** | Optional, free-form. |
+| **Location** (custom) | Leave blank. Deprecated v1.1 field; the location is parsed from Store Path. |
+| **Service Account Key File Path** (custom) | Leave blank. Deprecated v1.1 field; authentication uses Application Default Credentials. |
+| **Create Certificate Store If Missing** | **Check this.** Tells Command to create a new certificate store record from this candidate. Without it, the candidate sits in the discover tab with no store backing it. |
+| **Inventory Schedule** | Pick a cadence (e.g. Daily) for the inventory job to run after the store is created. |
+
+Click **SAVE** and the store is created. The next inventory run on its schedule will populate it with whatever certificates exist in that (project, location).
 
 ### Discovery job configuration
 
 Discovery is configured against the GCP Certificate Manager store type and enumerates candidate stores across an entire GCP organization. It uses the Cloud Resource Manager v3 API (`projects.search`) to list every active project the orchestrator's service account can see, then emits one candidate store path per (project, location) combination.
 
-| Field on the discovery-job form | What to put |
-|---|---|
-| **Client Machine** | The GCP Organization ID (e.g. `1005564431893`). Logged for traceability; not used as a query filter. |
-| **Server Username / Server Password** | Not used, but the form may require non-empty values. Type any placeholder (e.g. `unused` / `unused`). The orchestrator never reads them - GCP authentication uses Application Default Credentials, not username/password. |
-| **Directories to search** | Required by the Command UI. **Type `global`** for the default behavior of searching only GCP's global Certificate Manager location, which is what almost every operator wants. See "Should I ever put something other than `global`?" below for the rare exceptions. |
+The "Schedule Discovery" dialog inherits its layout from Keyfactor Command's generic Discovery UI, which was designed for filesystem-based store types (Java keystores, PEM files). Most fields don't apply to GCP. Here is what each field is and what to do with it:
 
-> **Why is the field labeled "Directories to search" if it accepts GCP regions?** Keyfactor Command's standard Discovery UI was designed for filesystem-based store types (Java keystores, PEM files in directories) where a comma-separated directory list is the natural input. The field label is hard-coded by Command and not something the orchestrator can change. For our purposes, treat it as "GCP locations to enumerate" - the orchestrator parses the value as a list of GCP region names.
+| Field on Schedule Discovery | What to put |
+|---|---|
+| **Category** | `GCP Certificate Manager` - already populated when reaching this dialog from the GCP store type. |
+| **Orchestrator** | Select an approved orchestrator with the `GcpCertMgr` capability. |
+| **Schedule** | When discovery should run. `Immediate` runs once on save; pick a recurring schedule for periodic re-enumeration. |
+| **Directories to search** | **Required.** Type `global` for the default behavior of searching only GCP's global Certificate Manager location, which is what almost every operator wants. See "Should I ever put something other than `global`?" below for the rare exceptions. |
+| **Directories to ignore** | Leave blank. Filesystem-store concept; not used by GCP discovery. |
+| **Extensions** | Leave blank. Filesystem-store concept; not used. |
+| **File name patterns to match** | Leave blank. Filesystem-store concept; not used. |
+| **Follow SymLinks** | Leave unchecked. Filesystem-store concept; not used. |
+| **Include PKCS12 Files?** | Leave unchecked. Filesystem-store concept; not used. |
+
+> **Why are most fields irrelevant to GCP?** Command's Discovery UI is one form template shared across every store type. For filesystem-based store types like Java keystores or PEM files, fields like *Directories to ignore*, *Extensions*, *File name patterns to match*, *Follow SymLinks*, and *Include PKCS12 Files?* are useful - they let the orchestrator narrow which files on disk it should treat as candidate stores. GCP Certificate Manager isn't a filesystem; the orchestrator uses Cloud Resource Manager + Certificate Manager APIs, so these fields are not consulted. The orchestrator does not raise an error if you fill them in; it just ignores them.
 
 #### Should I ever put something other than `global`?
 
@@ -148,10 +168,10 @@ The deprecation warnings will stop on the next job run once the store is fully m
 
 In v1.1 the orchestrator built the GCP resource path from **Client Machine** (= GCP Project ID) + the **Location** custom property, with **Store Path** unused (defaulted to `n/a`). Adding Discovery in v1.2 forced this model to change. Here's why.
 
-The Keyfactor `IDiscoveryJobExtension` contract emits a plain `List<string>` of discovered locations - there is no hook to set per-candidate Client Machine values. When an operator approves a discovered candidate (or auto-approval is enabled via the `Create Certificate Store If Missing` checkbox), Keyfactor Command creates the new store with:
+The Keyfactor `IDiscoveryJobExtension` contract emits a plain `List<string>` of discovered locations - there is no hook to set per-candidate Client Machine values. When an operator approves a discovered candidate (in the per-candidate edit dialog with `Create Certificate Store If Missing` checked), Keyfactor Command creates the new store with:
 
 - Store Path = the discovered location string (e.g. `projects/edgecerts/locations/global`)
-- Client Machine = whatever the discovery job's Client Machine was set to - one value shared across every candidate
+- Client Machine = whatever Command auto-populated on the discovery job (typically the orchestrator hostname) - one value shared across every candidate, *not* something the operator can set per-candidate
 - Custom properties = their store-type defaults
 
 Under the v1.1 model that meant every Discovery-approved store ended up with the *same* Client Machine across every project in the organization, which is wrong: each store needs its project ID to make GCP API calls. The first time inventory ran against a Discovery-approved store, that's exactly what produced an `HTTP 403 CONSUMER_INVALID` error against `projects/<orchestrator-hostname>/locations/global` - GCP correctly saying "that's not a valid project ID."
@@ -160,7 +180,7 @@ Under the v1.1 model that meant every Discovery-approved store ended up with the
 
 | Option | Why we didn't pick it |
 |---|---|
-| Force the operator to manually edit Client Machine after every Discovery approval | Friction. Discovery should produce working stores without an extra editing step per candidate, especially if the operator wants to use auto-approval. |
+| Force the operator to manually edit Client Machine after every Discovery approval | Friction. Discovery should produce working stores without an extra editing step per candidate. |
 | One discovery job per project (so each job's Client Machine = that project's ID) | Impractical: an organization with 100 projects would need 100 discovery jobs, each independently configured and scheduled. |
 | Have Discovery POST stores directly via Keyfactor Command's REST API instead of the standard `SubmitDiscoveryUpdate` callback | Non-standard pattern, much larger code surface, and diverges from how every other Keyfactor orchestrator works - making this orchestrator harder to maintain alongside the rest of the Keyfactor extension catalog. |
 | **Make Store Path the canonical source for both manual and Discovery flows** | Picked. The discovered storepath already encodes both project and location, so reading it directly (instead of reconstructing from Client Machine + Location) means Discovery-approved stores work with zero operator edits, and manually-created stores configure the same way. Smallest code change for the cleanest user-facing schema. |

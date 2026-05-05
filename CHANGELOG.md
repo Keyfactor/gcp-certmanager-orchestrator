@@ -3,9 +3,11 @@ v1.2.0 - unreleased
   GCP projects accessible to the orchestrator's service account and emits one
   candidate store path per (project, location) pair in canonical
   `projects/{projectId}/locations/{location}` form.
-  - Discovery-job ClientMachine is interpreted as the GCP Organization ID for
-    logging only; the actual project set is bounded by the service account's
-    IAM bindings (the customer scopes that at the org root).
+  - The Schedule Discovery form in Keyfactor Command does not expose a
+    Client Machine field for GCP - Command auto-populates it (typically the
+    orchestrator hostname) and the orchestrator logs it for traceability
+    only. The actual project set is bounded by the service account's IAM
+    bindings, not by anything the operator types into the discovery form.
   - "Directories to search" is repurposed as a comma-separated list of GCP
     locations (regions). The Keyfactor Command UI requires this field be
     non-empty; the recommended value is just `global`. The orchestrator also
@@ -32,9 +34,12 @@ v1.2.0 - unreleased
   enumeration that Discovery requires.
 
 ### Known limitations
-- The discovery-job ClientMachine field (Organization ID) is informational; if
-  the service account has visibility into multiple organizations, Discovery
-  will emit projects from all of them. Constrain at IAM if that's not desired.
+- The discovery-job ClientMachine value is auto-populated by Keyfactor Command
+  (typically the orchestrator hostname) and is not operator-configurable from
+  the Schedule Discovery dialog for GCP. It is logged for traceability but
+  never used by the orchestrator for filtering. If the service account has
+  visibility into multiple GCP organizations, Discovery emits projects from
+  all of them - constrain at IAM if that is not desired.
 - Discovery does not probe each (project, location) candidate to confirm the
   Certificate Manager API is enabled or that any certificates exist. Operators
   can leave `Create Certificate Store If Missing` checked to auto-approve every

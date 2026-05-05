@@ -93,6 +93,32 @@ A v1.1-shape store has `Store Path` empty or `n/a`, `Client Machine` set to the 
 
 The deprecation warning will stop on the next job run once Store Path is populated. The fallback will be removed in v2.0.
 
+### Design rationale: why Store Path is the source of truth
+
+In v1.1 the orchestrator built the GCP resource path from **Client Machine** (= GCP Project ID) + the **Location** custom property, with **Store Path** unused (defaulted to `n/a`). Adding Discovery in v1.2 forced this model to change. Here's why.
+
+The Keyfactor `IDiscoveryJobExtension` contract emits a plain `List<string>` of discovered locations - there is no hook to set per-candidate Client Machine values. When an operator approves a discovered candidate (or auto-approval is enabled via the `Create Certificate Store If Missing` checkbox), Keyfactor Command creates the new store with:
+
+- Store Path = the discovered location string (e.g. `projects/edgecerts/locations/global`)
+- Client Machine = whatever the discovery job's Client Machine was set to - one value shared across every candidate
+- Custom properties = their store-type defaults
+
+Under the v1.1 model that meant every Discovery-approved store ended up with the *same* Client Machine across every project in the organization, which is wrong: each store needs its project ID to make GCP API calls. The first time inventory ran against a Discovery-approved store, that's exactly what produced an `HTTP 403 CONSUMER_INVALID` error against `projects/<orchestrator-hostname>/locations/global` - GCP correctly saying "that's not a valid project ID."
+
+#### Alternatives considered
+
+| Option | Why we didn't pick it |
+|---|---|
+| Force the operator to manually edit Client Machine after every Discovery approval | Friction. Discovery should produce working stores without an extra editing step per candidate, especially if the operator wants to use auto-approval. |
+| One discovery job per project (so each job's Client Machine = that project's ID) | Impractical: an organization with 100 projects would need 100 discovery jobs, each independently configured and scheduled. |
+| Have Discovery POST stores directly via Keyfactor Command's REST API instead of the standard `SubmitDiscoveryUpdate` callback | Non-standard pattern, much larger code surface, and diverges from how every other Keyfactor orchestrator works - making this orchestrator harder to maintain alongside the rest of the Keyfactor extension catalog. |
+| **Make Store Path the canonical source for both manual and Discovery flows** | Picked. The discovered storepath already encodes both project and location, so reading it directly (instead of reconstructing from Client Machine + Location) means Discovery-approved stores work with zero operator edits, and manually-created stores configure the same way. Smallest code change for the cleanest user-facing schema. |
+
+#### Trade-offs we accepted
+
+- **Client Machine is now a display label**, not load-bearing. Some other Keyfactor orchestrators use Client Machine as a literal target host; for GCP that does not fit, because the orchestrator talks to a single GCP API endpoint regardless of which project a store targets - there is no per-store host to put there. The recommended value (GCP Organization ID) at least groups GCP stores together usefully in Command's UI.
+- **The Location custom property is deprecated, not removed**. Keeping it in the manifest with `Required: false` preserves v1.1 stores' UI rendering during the transition. The fallback path in `JobBase.ResolveGcpResourcePath` reads it for v1.1-shaped stores (Store Path blank or `n/a`) and emits a `LogWarning` each time naming the migration step. Removal is scheduled for v2.0.
+
 ### Vendor docs
 
 - [Google Cloud Certificate Manager](https://cloud.google.com/certificate-manager/docs)

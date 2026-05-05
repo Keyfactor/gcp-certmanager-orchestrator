@@ -44,7 +44,10 @@ v1.2.0 - unreleased
   stores configure the same way. **Store Path** is now the single source of
   truth for which Certificate Manager instance the store targets, in canonical
   form `projects/{projectId}/locations/{location}`. Inventory and Management
-  read the GCP resource path from this field for both flows.
+  read the GCP resource path from this field for both flows. Full design
+  rationale (constraint, alternatives considered, trade-offs accepted) lives
+  in `docsource/gcpcertmgr.md` under "Design rationale: why Store Path is the
+  source of truth".
 - **Client Machine** is repurposed as a display-only label. The recommended
   value is the GCP Organization ID; the orchestrator does not parse a project
   ID out of it. Documented in the updated store-type description.

@@ -71,6 +71,18 @@ v1.2.0 - unreleased
   `GcpCertificateManagerClient.LoadCredentials`. Removal is scheduled for
   v2.0.
 
+### Fixed
+- `integration-manifest.json` previously advertised `Create: true` under
+  `SupportedOperations`, but `Management.cs` has only ever handled `Add` and
+  `Remove` - a Create job from Keyfactor Command's UI fell through to the
+  default case and returned `Invalid Management Operation`. The manifest now
+  correctly reports `Create: false`. There is no meaningful semantic for
+  Create on a GCP Certificate Manager store anyway: the (project, location)
+  container is implicit in the GCP project, so there is no per-store
+  "creation" the orchestrator can usefully perform. Operators who relied on
+  scheduling Create jobs (and getting failures) should remove those job
+  definitions; everyone else is unaffected.
+
 ### Removed (docs)
 - Removed three Google Cloud Console screenshot GIFs from `docsource/` that
   documented the service-account creation, API enablement, and JSON-key

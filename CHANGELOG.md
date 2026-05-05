@@ -39,15 +39,29 @@ v1.2.0 - unreleased
   candidate and let dead-end stores fail their first inventory; or leave it
   unchecked and approve only the candidates they want to track.
 
-### Changed
-- Inventory and Management now derive the GCP resource path from the store's
-  `StorePath` when it is in canonical `projects/{p}/locations/{l}` form.
-  Discovery emits paths in this form, so Discovery-approved stores now work
-  without operators needing to edit `ClientMachine`/`Location` after approval -
-  whether `Create Certificate Store If Missing` was checked or not. Manually
-  created v1.1-shaped stores (where `StorePath` is `n/a`) keep building the
-  path from `ClientMachine` + the `Location` custom property, so existing
-  stores continue to work unchanged. See `JobBase.ResolveGcpResourcePath`.
+### Changed (schema unification)
+- Unified the store-type schema so manually-created and Discovery-approved
+  stores configure the same way. **Store Path** is now the single source of
+  truth for which Certificate Manager instance the store targets, in canonical
+  form `projects/{projectId}/locations/{location}`. Inventory and Management
+  read the GCP resource path from this field for both flows.
+- **Client Machine** is repurposed as a display-only label. The recommended
+  value is the GCP Organization ID; the orchestrator does not parse a project
+  ID out of it. Documented in the updated store-type description.
+- The **Location** custom property is deprecated. New stores leave it blank;
+  the value is parsed out of Store Path. The field remains in the manifest
+  with `Required: false` and a deprecation note so existing v1.1 stores keep
+  rendering correctly in Command's UI.
+
+### Backwards compatibility
+- v1.1-shape stores (Store Path blank or `n/a`, Client Machine = Project ID,
+  Location custom property = region) continue to work via a deprecation-logged
+  fallback path in `JobBase.ResolveGcpResourcePath`. Every inventory or
+  management run against such a store emits a single `LogWarning` naming the
+  store and the migration step. The fallback is scheduled for removal in v2.0.
+- Migration: edit each affected store, set Store Path to
+  `projects/{ClientMachine-value}/locations/{Location-value}`, optionally
+  change Client Machine to the GCP Organization ID, optionally clear Location.
 
 v1.1.0
 - Implemented dual build for .net6/8

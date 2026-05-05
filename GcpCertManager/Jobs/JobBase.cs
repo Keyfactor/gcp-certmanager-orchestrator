@@ -142,17 +142,14 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
 
         /// <summary>
         /// Resolve the GCP resource path (<c>projects/{projectId}/locations/{location}</c>)
-        /// for a certificate store. When Discovery-approved stores arrive in Command,
-        /// <c>StorePath</c> already carries the canonical GCP path - trust it. For
-        /// manually-created stores (v1.1 shape, where StorePath is "n/a") fall back to
-        /// composing the path from ClientMachine + the Location custom property.
+        /// for a certificate store. As of v1.2 the canonical source is the store's
+        /// <c>StorePath</c>; both Discovery-approved and manually-created stores set it
+        /// to <c>projects/{projectId}/locations/{location}</c>. The fallback to
+        /// ClientMachine + the Location custom property exists only to keep v1.1-shape
+        /// stores (where StorePath is blank or <c>n/a</c>) working through an upgrade,
+        /// and it logs a deprecation warning when it fires.
         /// </summary>
-        /// <remarks>
-        /// This makes Discovery's auto-approval path produce working stores without
-        /// requiring an operator to edit ClientMachine after approval. ClientMachine
-        /// still matters for v1.1-shaped manually-created stores; both paths coexist.
-        /// </remarks>
-        protected static string ResolveGcpResourcePath(string storePath, string projectId, string location)
+        protected string ResolveGcpResourcePath(string storePath, string projectId, string location)
         {
             if (!string.IsNullOrWhiteSpace(storePath))
             {
@@ -165,6 +162,15 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                     return trimmed;
                 }
             }
+
+            // v1.1 fallback. Log a deprecation warning so operators reading orchestrator
+            // logs (or running this in dev) know the store should be migrated to the v1.2
+            // schema (set StorePath to projects/{projectId}/locations/{location}).
+            Logger?.LogWarning(
+                "Store is using v1.1-shape configuration (ClientMachine={ProjectId}, Location={Location}, StorePath blank or 'n/a'). " +
+                "This is deprecated as of v1.2 and the fallback will be removed in v2.0. " +
+                "Edit the store and set Store Path to 'projects/{ProjectId}/locations/{Location}' to migrate.",
+                projectId, location, projectId, location);
 
             return $"projects/{projectId}/locations/{location}";
         }

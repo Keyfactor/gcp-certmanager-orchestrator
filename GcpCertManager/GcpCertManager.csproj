@@ -20,10 +20,11 @@
 
   <ItemGroup>
     <PackageReference Include="Google.Apis.CertificateManager.v1" Version="1.57.0.2653" />
+    <PackageReference Include="Google.Apis.CloudResourceManager.v3" Version="1.69.0.3689" />
     <PackageReference Include="Google.Apis.Iam.v1" Version="1.68.0.3395" />
     <PackageReference Include="Google.Protobuf" Version="3.20.1" />
     <PackageReference Include="Keyfactor.Logging" Version="1.1.1" />
-    <PackageReference Include="Keyfactor.Orchestrators.IOrchestratorJobExtensions" Version="0.6.0" />
+    <PackageReference Include="Keyfactor.Orchestrators.IOrchestratorJobExtensions" Version="0.7.0" />
     <PackageReference Include="Portable.BouncyCastle" Version="1.9.0" />
     <PackageReference Include="RestSharp" Version="107.2.1" />
     <PackageReference Include="System.Management.Automation" Version="7.0.5" />

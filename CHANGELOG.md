@@ -125,4 +125,4 @@ v1.1.0
 - Converted README to use doctool
 
 v1.0.2
-- Initial Public Version
+- Initial Public Version For Release

@@ -8,6 +8,7 @@ using System.IO;
 using System.Reflection;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.CertificateManager.v1;
+using Google.Apis.CloudResourceManager.v3;
 using Google.Apis.Services;
 using Google.Apis.Iam.v1;
 using Google.Apis.Iam.v1.Data;
@@ -26,27 +27,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Client
         {
             ILogger _logger = LogHandler.GetClassLogger<CertificateManagerService>();
 
-            //Credentials file needs to be in the same location of the executing assembly
-            GoogleCredential credentials;
-
-            if (!string.IsNullOrEmpty(credentialFileName))
-            {
-                _logger.LogDebug("Has credential file name");
-                var strExeFilePath = Assembly.GetExecutingAssembly().Location;
-                var strWorkPath = Path.GetDirectoryName(strExeFilePath);
-                var strSettingsJsonFilePath = Path.Combine(strWorkPath ?? string.Empty, credentialFileName);
-
-                var stream = new FileStream(strSettingsJsonFilePath,
-                    FileMode.Open
-                );
-
-                credentials = GoogleCredential.FromStream(stream);
-            }
-            else
-            {
-                _logger.LogDebug("No credential file name");
-                credentials = GoogleCredential.GetApplicationDefaultAsync().Result;
-            }
+            var credentials = LoadCredentials(credentialFileName, _logger);
 
             var service = new CertificateManagerService(new BaseClientService.Initializer
             {
@@ -54,6 +35,58 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Client
             });
 
             return service;
+        }
+
+        public CloudResourceManagerService GetCloudResourceManager(string credentialFileName)
+        {
+            ILogger _logger = LogHandler.GetClassLogger<CloudResourceManagerService>();
+
+            // CloudResourceManager.search requires the cloud-platform scope when using ADC
+            // from a Compute Engine / GKE service account; FromStream credentials carry
+            // their own scopes from the JSON key.
+            var credentials = LoadCredentials(credentialFileName, _logger);
+            if (credentials.IsCreateScopedRequired)
+                credentials = credentials.CreateScoped(CloudResourceManagerService.Scope.CloudPlatformReadOnly);
+
+            var service = new CloudResourceManagerService(new BaseClientService.Initializer
+            {
+                HttpClientInitializer = credentials
+            });
+
+            return service;
+        }
+
+        private static GoogleCredential LoadCredentials(string credentialFileName, ILogger logger)
+        {
+            // Credential resolution order:
+            //   1. Explicit ServiceAccountKey (file in the extension dir) - DEPRECATED in v1.2
+            //   2. Application Default Credentials (GOOGLE_APPLICATION_CREDENTIALS env var,
+            //      or GCE VM / GKE pod metadata server when running inside GCP)
+            //
+            // ADC is the canonical path because the Keyfactor discovery-job UI does not
+            // surface the per-store ServiceAccountKey custom property, so file-based auth
+            // can't be configured uniformly across all four job types.
+            if (!string.IsNullOrEmpty(credentialFileName))
+            {
+                logger.LogWarning(
+                    "The ServiceAccountKey store property ('{FileName}') is deprecated as of v1.2 and will be removed in v2.0. " +
+                    "Switch to Application Default Credentials by setting GOOGLE_APPLICATION_CREDENTIALS as a machine-level " +
+                    "environment variable on the orchestrator host (or by running the orchestrator on a GCE VM / GKE pod with " +
+                    "workload identity), then clear this store property.",
+                    credentialFileName);
+
+                var strExeFilePath = Assembly.GetExecutingAssembly().Location;
+                var strWorkPath = Path.GetDirectoryName(strExeFilePath);
+                var strSettingsJsonFilePath = Path.Combine(strWorkPath ?? string.Empty, credentialFileName);
+
+                using (var stream = new FileStream(strSettingsJsonFilePath, FileMode.Open))
+                {
+                    return GoogleCredential.FromStream(stream);
+                }
+            }
+
+            logger.LogDebug("Using Application Default Credentials");
+            return GoogleCredential.GetApplicationDefaultAsync().Result;
         }
 
         public ServiceAccountKey CreateServiceAccountKey(string serviceAccountEmail)

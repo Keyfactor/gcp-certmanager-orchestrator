@@ -5,9 +5,9 @@
 <p align="center">
   <!-- Badges -->
 <img src="https://img.shields.io/badge/integration_status-production-3D1973?style=flat-square" alt="Integration Status: production" />
-<a href="https://github.com/Keyfactor/gcp-certmanager-orchestrator/releases"><img src="https://img.shields.io/github/v/release/Keyfactor/gcp-certmanager-orchestrator?style=flat-square" alt="Release" /></a>
-<img src="https://img.shields.io/github/issues/Keyfactor/gcp-certmanager-orchestrator?style=flat-square" alt="Issues" />
-<img src="https://img.shields.io/github/downloads/Keyfactor/gcp-certmanager-orchestrator/total?style=flat-square&label=downloads&color=28B905" alt="GitHub Downloads (all assets, all releases)" />
+<a href="https://github.com/Keyfactor/Google Cloud Provider Certificate Manager/releases"><img src="https://img.shields.io/github/v/release/Keyfactor/Google Cloud Provider Certificate Manager?style=flat-square" alt="Release" /></a>
+<img src="https://img.shields.io/github/issues/Keyfactor/Google Cloud Provider Certificate Manager?style=flat-square" alt="Issues" />
+<img src="https://img.shields.io/github/downloads/Keyfactor/Google Cloud Provider Certificate Manager/total?style=flat-square&label=downloads&color=28B905" alt="GitHub Downloads (all assets, all releases)" />
 </p>
 
 <p align="center">
@@ -47,13 +47,12 @@ This applies equally to manually-created stores and Discovery-approved stores. T
 
 The Discovery job enumerates every GCP project that the orchestrator's service account can see and proposes one candidate store per (project, location) pair, with Store Path pre-populated in canonical form. The actual scope of discovery is bounded by IAM - grant the service account the appropriate role at the organization root and Discovery will return everything underneath. See the GCP Certificate Manager store-type page for full operator-facing details.
 
-
-
 ## Compatibility
 
 This integration is compatible with Keyfactor Universal Orchestrator version 10.4.1 and later.
 
 ## Support
+
 The Google Cloud Provider Certificate Manager Universal Orchestrator extension is supported by Keyfactor. If you require support for any issues or have feature request, please open a support ticket by either contacting your Keyfactor representative or via the Keyfactor Support Portal at https://support.keyfactor.com.
 
 > If you want to contribute bug fixes or additional enhancements, use the **[Pull requests](../../pulls)** tab.
@@ -62,13 +61,9 @@ The Google Cloud Provider Certificate Manager Universal Orchestrator extension i
 
 Before installing the Google Cloud Provider Certificate Manager Universal Orchestrator extension, we recommend that you install [kfutil](https://github.com/Keyfactor/kfutil). Kfutil is a command-line tool that simplifies the process of creating store types, installing extensions, and instantiating certificate stores in Keyfactor Command.
 
-
-
 ## GcpCertMgr Certificate Store Type
 
 To use the Google Cloud Provider Certificate Manager Universal Orchestrator extension, you **must** create the GcpCertMgr Certificate Store Type. This only needs to happen _once_ per Keyfactor Command instance.
-
-
 
 The `GcpCertMgr` store type represents a single (Project, Location) pair within Google Cloud Certificate Manager. The orchestrator manages self-managed certificates inside that container - listing them for inventory, uploading new PFX certificates, and deleting existing certificates by alias.
 
@@ -267,24 +262,22 @@ Under the v1.1 model that meant every Discovery-approved store ended up with the
 - [Cloud Resource Manager v3 - projects.search](https://cloud.google.com/resource-manager/reference/rest/v3/projects/search)
 - [Application Default Credentials](https://cloud.google.com/docs/authentication/application-default-credentials)
 
-
-
-
 #### Supported Operations
 
-| Operation    | Is Supported                                                                                                           |
-|--------------|------------------------------------------------------------------------------------------------------------------------|
-| Add          | ✅ Checked        |
-| Remove       | ✅ Checked     |
-| Discovery    | ✅ Checked  |
+| Operation    | Is Supported |
+|--------------|--------------|
+| Add          | ✅ Checked |
+| Remove       | ✅ Checked |
+| Discovery    | ✅ Checked |
 | Reenrollment | 🔲 Unchecked |
-| Create       | 🔲 Unchecked     |
+| Create       | 🔲 Unchecked |
 
 #### Store Type Creation
 
 ##### Using kfutil:
 `kfutil` is a custom CLI for the Keyfactor Command API and can be used to create certificate store types.
 For more information on [kfutil](https://github.com/Keyfactor/kfutil) check out the [docs](https://github.com/Keyfactor/kfutil?tab=readme-ov-file#quickstart)
+
    <details><summary>Click to expand GcpCertMgr kfutil details</summary>
 
    ##### Using online definition from GitHub:
@@ -303,10 +296,10 @@ For more information on [kfutil](https://github.com/Keyfactor/kfutil) check out 
    ```
    </details>
 
-
 #### Manual Creation
 Below are instructions on how to create the GcpCertMgr store type manually in
 the Keyfactor Command Portal
+
    <details><summary>Click to expand manual GcpCertMgr details</summary>
 
    Create a store type called `GcpCertMgr` with the attributes in the tables below:
@@ -317,11 +310,11 @@ the Keyfactor Command Portal
    | Name | GCP Certificate Manager | Display name for the store type (may be customized) |
    | Short Name | GcpCertMgr | Short display name for the store type |
    | Capability | GcpCertMgr | Store type name orchestrator will register with. Check the box to allow entry of value |
-   | Supports Add | ✅ Checked | Check the box. Indicates that the Store Type supports Management Add |
-   | Supports Remove | ✅ Checked | Check the box. Indicates that the Store Type supports Management Remove |
-   | Supports Discovery | ✅ Checked | Check the box. Indicates that the Store Type supports Discovery |
-   | Supports Reenrollment | 🔲 Unchecked |  Indicates that the Store Type supports Reenrollment |
-   | Supports Create | 🔲 Unchecked |  Indicates that the Store Type supports store creation |
+   | Supports Add | ✅ Checked | Indicates that the Store Type supports Management Add |
+   | Supports Remove | ✅ Checked | Indicates that the Store Type supports Management Remove |
+   | Supports Discovery | ✅ Checked | Indicates that the Store Type supports Discovery |
+   | Supports Reenrollment | 🔲 Unchecked | Indicates that the Store Type supports Reenrollment |
+   | Supports Create | 🔲 Unchecked | Indicates that the Store Type supports store creation |
    | Needs Server | 🔲 Unchecked | Determines if a target server name is required when creating store |
    | Blueprint Allowed | 🔲 Unchecked | Determines if store type may be included in an Orchestrator blueprint |
    | Uses PowerShell | 🔲 Unchecked | Determines if underlying implementation is PowerShell |
@@ -330,18 +323,18 @@ the Keyfactor Command Portal
 
    The Basic tab should look like this:
 
-   ![GcpCertMgr Basic Tab](docsource/images/GcpCertMgr-basic-store-type-dialog.png)
+   ![GcpCertMgr Basic Tab](docsource/images/GcpCertMgr-basic-store-type-dialog.svg)
 
    ##### Advanced Tab
    | Attribute | Value | Description |
    | --------- | ----- | ----- |
    | Supports Custom Alias | Required | Determines if an individual entry within a store can have a custom Alias. |
-   | Private Key Handling | Required | This determines if Keyfactor can send the private key associated with a certificate to the store. Required because IIS certificates without private keys would be invalid. |
+   | Private Key Handling | Required | This determines if Keyfactor can send the private key associated with a certificate to the store. |
    | PFX Password Style | Default | 'Default' - PFX password is randomly generated, 'Custom' - PFX password may be specified when the enrollment job is created (Requires the Allow Custom Password application setting to be enabled.) |
 
    The Advanced tab should look like this:
 
-   ![GcpCertMgr Advanced Tab](docsource/images/GcpCertMgr-advanced-store-type-dialog.png)
+   ![GcpCertMgr Advanced Tab](docsource/images/GcpCertMgr-advanced-store-type-dialog.svg)
 
    > For Keyfactor **Command versions 24.4 and later**, a Certificate Format dropdown is available with PFX and PEM options. Ensure that **PFX** is selected, as this determines the format of new and renewed certificates sent to the Orchestrator during a Management job. Currently, all Keyfactor-supported Orchestrator extensions support only PFX.
 
@@ -355,41 +348,34 @@ the Keyfactor Command Portal
 
    The Custom Fields tab should look like this:
 
-   ![GcpCertMgr Custom Fields Tab](docsource/images/GcpCertMgr-custom-fields-store-type-dialog.png)
-
+   ![GcpCertMgr Custom Fields Tab](docsource/images/GcpCertMgr-custom-fields-store-type-dialog.svg)
 
    ###### Location (deprecated)
    **Deprecated in v1.2.** The GCP location is parsed from Store Path. Leave blank for new stores. v1.1-shape stores (where Store Path is blank or `n/a`) still read this value as a fallback; expect a deprecation warning in the orchestrator log when that path is used.
 
-   ![GcpCertMgr Custom Field - Location](docsource/images/GcpCertMgr-custom-field-Location-dialog.png)
-   ![GcpCertMgr Custom Field - Location](docsource/images/GcpCertMgr-custom-field-Location-validation-options-dialog.png)
-
+   ![GcpCertMgr Custom Field - Location](docsource/images/GcpCertMgr-custom-field-Location-dialog.svg)
 
 
    ###### Service Account Key File Path (deprecated)
    **Deprecated in v1.2.** Leave blank. Authenticate via Application Default Credentials instead (set `GOOGLE_APPLICATION_CREDENTIALS` as a machine-level environment variable on the orchestrator host pointing at the JSON key, or run on a GCE VM / GKE pod with workload identity). The Discovery job has no way to surface this custom property in Keyfactor Command's discovery-job UI, so ADC is the only mechanism that works uniformly across all four job types. v1.1 stores that have this populated continue to work via a deprecation-logged fallback; the field is scheduled for removal in v2.0.
 
-   ![GcpCertMgr Custom Field - ServiceAccountKey](docsource/images/GcpCertMgr-custom-field-ServiceAccountKey-dialog.png)
-   ![GcpCertMgr Custom Field - ServiceAccountKey](docsource/images/GcpCertMgr-custom-field-ServiceAccountKey-validation-options-dialog.png)
-
-
-
+   ![GcpCertMgr Custom Field - ServiceAccountKey](docsource/images/GcpCertMgr-custom-field-ServiceAccountKey-dialog.svg)
 
 
    </details>
-
 ## Installation
 
 1. **Download the latest Google Cloud Provider Certificate Manager Universal Orchestrator extension from GitHub.**
 
-    Navigate to the [Google Cloud Provider Certificate Manager Universal Orchestrator extension GitHub version page](https://github.com/Keyfactor/gcp-certmanager-orchestrator/releases/latest). Refer to the compatibility matrix below to determine the asset should be downloaded. Then, click the corresponding asset to download the zip archive.
+    Navigate to the [Google Cloud Provider Certificate Manager Universal Orchestrator extension GitHub version page](https://github.com/Keyfactor/Google Cloud Provider Certificate Manager/releases/latest). Refer to the compatibility matrix below to determine which asset should be downloaded. Then, click the corresponding asset to download the zip archive.
 
-   | Universal Orchestrator Version | Latest .NET version installed on the Universal Orchestrator server | `rollForward` condition in `Orchestrator.runtimeconfig.json` | `gcp-certmanager-orchestrator` .NET version to download |
+   | Universal Orchestrator Version | Latest .NET version installed on the Universal Orchestrator server | `rollForward` condition in `Orchestrator.runtimeconfig.json` | `Google Cloud Provider Certificate Manager` .NET version to download |
    | --------- | ----------- | ----------- | ----------- |
    | Older than `11.0.0` | | | `net6.0` |
    | Between `11.0.0` and `11.5.1` (inclusive) | `net6.0` | | `net6.0` |
-   | Between `11.0.0` and `11.5.1` (inclusive) | `net8.0` | `Disable` | `net6.0` || Between `11.0.0` and `11.5.1` (inclusive) | `net8.0` | `LatestMajor` | `net8.0` |
-   | `11.6` _and_ newer | `net8.0` | | `net8.0` | 
+   | Between `11.0.0` and `11.5.1` (inclusive) | `net8.0` | `Disable` | `net6.0` |
+   | Between `11.0.0` and `11.5.1` (inclusive) | `net8.0` | `LatestMajor` | `net8.0` |
+   | `11.6` _and_ newer | `net8.0` | | `net8.0` |
 
     Unzip the archive containing extension assemblies to a known location.
 
@@ -402,24 +388,18 @@ the Keyfactor Command Portal
 
 3. **Create a new directory for the Google Cloud Provider Certificate Manager Universal Orchestrator extension inside the extensions directory.**
 
-    Create a new directory called `gcp-certmanager-orchestrator`.
+    Create a new directory called `Google Cloud Provider Certificate Manager`.
     > The directory name does not need to match any names used elsewhere; it just has to be unique within the extensions directory.
 
-4. **Copy the contents of the downloaded and unzipped assemblies from __step 2__ to the `gcp-certmanager-orchestrator` directory.**
+4. **Copy the contents of the downloaded and unzipped assemblies from __step 2__ to the `Google Cloud Provider Certificate Manager` directory.**
 
 5. **Restart the Universal Orchestrator service.**
 
     Refer to [Starting/Restarting the Universal Orchestrator service](https://software.keyfactor.com/Core-OnPrem/Current/Content/InstallingAgents/NetCoreOrchestrator/StarttheService.htm).
 
-
-
 > The above installation steps can be supplemented by the [official Command documentation](https://software.keyfactor.com/Core-OnPrem/Current/Content/InstallingAgents/NetCoreOrchestrator/CustomExtensions.htm?Highlight=extensions).
 
-
-
 ## Defining Certificate Stores
-
-
 
 ### Store Creation
 
@@ -435,8 +415,8 @@ the Keyfactor Command Portal
 
     Click the Add button to add a new Certificate Store. Use the table below to populate the **Attributes** in the **Add** form.
 
-   | Attribute | Description                                             |
-   | --------- |---------------------------------------------------------|
+   | Attribute | Description |
+   | --------- | ----------- |
    | Category | Select "GCP Certificate Manager" or the customized certificate store name from the previous step. |
    | Container | Optional container to associate certificate store with. |
    | Client Machine | Display label for grouping certificate stores in Keyfactor Command. Recommended value is the GCP Organization ID (e.g. `1005564431893`); the orchestrator does not parse a project ID out of this field. The actual GCP project + location are read from Store Path. |
@@ -446,8 +426,6 @@ the Keyfactor Command Portal
    | ServiceAccountKey | **Deprecated in v1.2.** Leave blank. Authenticate via Application Default Credentials instead (set `GOOGLE_APPLICATION_CREDENTIALS` as a machine-level environment variable on the orchestrator host pointing at the JSON key, or run on a GCE VM / GKE pod with workload identity). The Discovery job has no way to surface this custom property in Keyfactor Command's discovery-job UI, so ADC is the only mechanism that works uniformly across all four job types. v1.1 stores that have this populated continue to work via a deprecation-logged fallback; the field is scheduled for removal in v2.0. |
 
 </details>
-
-
 
 #### Using kfutil CLI
 
@@ -480,11 +458,7 @@ the Keyfactor Command Portal
 
 </details>
 
-
-
 > The content in this section can be supplemented by the [official Command documentation](https://software.keyfactor.com/Core-OnPrem/Current/Content/ReferenceGuide/Certificate%20Stores.htm?Highlight=certificate%20store).
-
-
 
 
 ## GCP setup prerequisites
@@ -540,7 +514,6 @@ The orchestrator authenticates exclusively via [Application Default Credentials]
 3. Set the `GOOGLE_APPLICATION_CREDENTIALS` machine-level environment variable to the absolute path of the JSON key. Restart the Keyfactor Orchestrator service so it picks up the variable.
 
 > **Note on the deprecated `Service Account Key File Path` store property.** Earlier versions of the orchestrator accepted a JSON filename in a per-store custom property and read the file from the orchestrator extension directory. That mechanism is deprecated in v1.2 because the Discovery job has no way to surface custom store properties in Keyfactor Command's discovery-job UI - so file-based auth can't be configured uniformly across all four job types. Existing v1.1 stores with the property populated continue to work, but every job run logs a deprecation warning. The field is scheduled for removal in v2.0.
-
 
 ## License
 

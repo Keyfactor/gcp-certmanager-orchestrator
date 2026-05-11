@@ -20,7 +20,7 @@ That single value carries both the GCP project and the location (region or `glob
 | **Client Machine** | Display label only. Recommended: GCP Organization ID (e.g. `1005564431893`). Not parsed. | UI grouping in Command |
 | **Service Account Key File Path** (custom, *deprecated*) | v1.1 shape only. Leave blank for new stores - authentication uses Application Default Credentials. | Credential loader fallback; emits a deprecation warning when read |
 | **Location** (custom, *deprecated*) | v1.1 shape only. New stores leave it blank. Used as a fallback when Store Path is empty or `n/a`. | v1.1 fallback path; emits a deprecation warning when read |
-| **Certificate Scope** (custom) | GCP `scope` to apply to every new certificate created in this store. One of `DEFAULT`, `ALL_REGIONS`, `EDGE_CACHE`, `CLIENT_AUTH`. Blank → `DEFAULT`. Immutable on each cert once set in GCP - use one store per scope. See "Certificate scope" below. | Management/Add |
+| **Certificate Scope** (*entry parameter*, not a store property) | GCP `scope` for an individual certificate entry. One of `DEFAULT`, `ALL_REGIONS`, `EDGE_CACHE`, `CLIENT_AUTH`. Set per-cert at Add time; Inventory persists the existing value back from GCP so renewals carry it forward. Defined under the store type's EntryParameters, not Properties. See "Certificate scope" below. | Management/Add (read from `JobProperties`), Inventory (write to per-entry `Parameters`) |
 
 #### Location semantics: where the GCP region lives
 
@@ -66,7 +66,8 @@ Set:
 - **Store Path**: `projects/{projectId}/locations/{location}` - e.g. `projects/edgecerts/locations/global`
 - **Service Account Key File Path**: leave blank (deprecated; ADC is used)
 - **Location**: leave blank
-- **Certificate Scope**: `DEFAULT` for global external Application Load Balancers (the common case). Set to `ALL_REGIONS` if this store provisions certs for cross-region internal Application Load Balancers; `EDGE_CACHE` for Media CDN; `CLIENT_AUTH` for mTLS trust configs. See "Certificate scope" below.
+
+Scope is set per-cert at Add time (entry parameter, not store property) - see "Certificate scope" below. A single store can hold certificates at multiple scopes.
 
 Authentication uses Application Default Credentials - see "Service account credentials" below.
 
@@ -81,7 +82,6 @@ After the discovery job runs, candidates appear in **Locations → Certificate S
 | **Application** | Optional, free-form. |
 | **Location** (custom) | Leave blank. Deprecated v1.1 field; the location is parsed from Store Path. |
 | **Service Account Key File Path** (custom) | Leave blank. Deprecated v1.1 field; authentication uses Application Default Credentials. |
-| **Certificate Scope** (custom) | Defaults to `DEFAULT`. Change only if this discovered store is going to back a non-default scope (`ALL_REGIONS`, `EDGE_CACHE`, `CLIENT_AUTH`) - Discovery does not know which scope your downstream load balancers need, so the operator sets it at approval time. Discovery emits one candidate per (project, location); if you need both `DEFAULT` and `ALL_REGIONS` certs in the same (project, location), reject this candidate and create two stores manually instead. See "Certificate scope" below. |
 | **Create Certificate Store If Missing** | **Check this.** Tells Command to create a new certificate store record from this candidate. Without it, the candidate sits in the discover tab with no store backing it. |
 | **Inventory Schedule** | Pick a cadence (e.g. Daily) for the inventory job to run after the store is created. |
 
@@ -153,34 +153,42 @@ The orchestrator validates the alias against this rule **before** any API calls 
 
 ### Certificate scope
 
-GCP Certificate Manager attaches a `scope` to every certificate that determines which load balancer / service families can consume it. The `Scope` custom store property tells the orchestrator which value to pass to GCP on create.
+GCP Certificate Manager attaches a `scope` to every certificate that determines which load balancer / service families can consume it. The orchestrator models this as a per-entry **entry parameter** (defined under `EntryParameters` on the store type), not a store property. That matches GCP's own data model - a single (project, location) container in GCP can legitimately hold certificates with different scopes.
 
 | Value | What it is for |
 |---|---|
-| `DEFAULT` | Global external Application Load Balancers - the standard GCP load balancer for internet-facing traffic. This is the GCP default and the right answer for most stores. |
+| `DEFAULT` | Global external Application Load Balancers - the standard GCP load balancer for internet-facing traffic. This is the GCP default and the right answer for most certs. |
 | `ALL_REGIONS` | Cross-region **internal** Application Load Balancers. Use this when the consuming load balancer is regional/internal and replicated across regions. |
 | `EDGE_CACHE` | Google Cloud Media CDN edge-cache certs. |
 | `CLIENT_AUTH` | Certificates used by mTLS trust configs, or server certificates that are authorized for client authentication. |
 
+#### How operators set it
+
+On Management/Add (uploading a new cert into a store), Keyfactor Command renders a dropdown for "Certificate Scope" sourced from the store type's `EntryParameters` definition. Pick one of the four values; default is `DEFAULT`. The chosen value lands in `ManagementJobConfiguration.JobProperties["Scope"]` and the orchestrator passes it to GCP on the `certificates.create` call.
+
+On renewals / reenrollments, Keyfactor pre-fills the dropdown from the certificate's last-known inventory parameters, so the cert keeps its scope automatically across renewal cycles without operator action.
+
 #### Immutability
 
-The `scope` field is **create-only** in the GCP API. Once GCP creates a certificate with a given scope, that scope cannot be changed by any patch operation. The orchestrator's Management/Replace path uses `UpdateMask = "SelfManaged"`, so re-adding a certificate over an existing one preserves its original scope - even if the store's Scope property has changed. To migrate a certificate to a different scope, delete it (Management/Remove) and re-add it with the new scope.
+The `scope` field is **create-only** in the GCP API. Once GCP creates a certificate with a given scope, that scope cannot be changed by any patch operation. The orchestrator's Management/Replace path uses `UpdateMask = "SelfManaged"`, so re-adding a certificate over an existing one preserves its original scope - even if the operator selects a different scope in the renewal dialog. To migrate a certificate to a different scope, delete it (Management/Remove) and re-add it with the new scope.
 
-This is why the recommended deployment pattern is **one store per (project, location, scope) tuple**. The Scope property is store-wide, not per-cert.
+#### Inventory persists scope per-cert
+
+The Inventory job reads the `scope` field off each `certificates.list` response and writes it into the cert's `CurrentInventoryItem.Parameters` dict. GCP omits the field from the response when the cert is at the default scope; the orchestrator normalizes null/blank to `DEFAULT` so Command's UI always shows a concrete value. After the first inventory run on a store, every cert displays its actual GCP scope in Command, and that value flows back through to Management jobs on subsequent renew/reenrollment operations.
 
 #### What happened before v1.2.1
 
-Prior to v1.2.1 the orchestrator hard-coded `Scope = "DEFAULT"` on every certificate it created. Customers who needed non-default scopes (typically `ALL_REGIONS` for cross-region internal ALBs) had to pre-create empty placeholder certificate resources in GCP via Terraform with `scope = "ALL_REGIONS"`, then point Keyfactor at the existing resource as a Replace target. The new property removes that workaround: a store with Scope = `ALL_REGIONS` will create new certificate resources directly at the right scope.
+Prior to v1.2.1 the orchestrator hard-coded `Scope = "DEFAULT"` on every certificate it created and never read `scope` back during Inventory. Customers who needed non-default scopes (typically `ALL_REGIONS` for cross-region internal ALBs) had to pre-create empty placeholder certificate resources in GCP via Terraform with `scope = "ALL_REGIONS"`, then point Keyfactor at the existing resource as a Replace target. The new entry parameter removes that workaround.
 
 #### How the orchestrator validates the value
 
-`JobBase.ResolveScope` runs as the `ResolveScope` flow step on every Management/Add. It trims and uppercases the configured value, then validates it against the set GCP accepts. An unsupported value (typo, lowercase letters that don't normalize to a valid token, anything outside the four allowed values) fails with `[FAIL] ResolveScope` and a clear message naming the four legal values. Blank or null resolves to `DEFAULT`.
+`JobBase.ResolveScope` runs as the `ResolveScope` flow step on every Management/Add. It trims and uppercases the configured value, then validates it against the set GCP accepts. An unsupported value (typo, lowercase letters that don't normalize to a valid token, anything outside the four allowed values) fails with `[FAIL] ResolveScope` and a clear message naming the four legal values. Blank or null resolves to `DEFAULT`. The dropdown UI in Command should prevent invalid values from reaching the orchestrator in the first place; `ResolveScope` is defence-in-depth for direct-API submissions.
 
 #### Quick reference
 
-- "Where do I see what scope a certificate ended up with?" → GCP's Certificate Manager Console, or `gcloud certificate-manager certificates describe <name> --location=<loc> --project=<proj>`. The orchestrator's Inventory job does not surface scope today.
+- "Where do I see what scope a certificate ended up with?" → Run inventory once - it surfaces in the cert's Parameters in Command. Also `gcloud certificate-manager certificates describe <name> --location=<loc> --project=<proj>`.
 - "Can I change a certificate's scope?" → No. Delete and re-add.
-- "I have one store with DEFAULT certs and I want to add an ALL_REGIONS cert" → Create a second store with the same (project, location) but Scope = `ALL_REGIONS`.
+- "I have one store with DEFAULT certs and I want to add an ALL_REGIONS cert" → Add the new cert with Scope = `ALL_REGIONS` from the dropdown. Existing DEFAULT certs in the same store are unaffected; the field is per-entry, not store-wide.
 
 ### Architecture and logging
 

@@ -57,19 +57,25 @@ $Body = @'
       "Required": false,
       "IsPAMEligible": false,
       "Description": "**Deprecated in v1.2.** Leave blank. Authenticate via Application Default Credentials instead (set `GOOGLE_APPLICATION_CREDENTIALS` as a machine-level environment variable on the orchestrator host pointing at the JSON key, or run on a GCE VM / GKE pod with workload identity). The Discovery job has no way to surface this custom property in Keyfactor Command's discovery-job UI, so ADC is the only mechanism that works uniformly across all four job types. v1.1 stores that have this populated continue to work via a deprecation-logged fallback; the field is scheduled for removal in v2.0."
-    },
+    }
+  ],
+  "EntryParameters": [
     {
       "Name": "Scope",
       "DisplayName": "Certificate Scope",
-      "Type": "String",
+      "Type": "MultipleChoice",
       "DependsOn": "",
       "DefaultValue": "DEFAULT",
-      "Required": false,
-      "IsPAMEligible": false,
-      "Description": "GCP Certificate Manager `scope` value applied to every new certificate created in this store. Allowed: `DEFAULT` (global external Application Load Balancers - the GCP default), `ALL_REGIONS` (cross-region internal Application Load Balancers), `EDGE_CACHE` (Media CDN), `CLIENT_AUTH` (mTLS trust configs / authorized client server certs). **Immutable in GCP** - once a certificate is created with a given scope, GCP refuses to change it. To use a different scope, delete and re-add the certificate. Pick the scope that matches the load balancer / service this store provisions certs for, and use one store per scope. Leave blank or set to `DEFAULT` for the legacy behavior."
+      "Options": "DEFAULT,ALL_REGIONS,EDGE_CACHE,CLIENT_AUTH",
+      "RequiredWhen": {
+        "HasPrivateKey": false,
+        "OnAdd": false,
+        "OnRemove": false,
+        "OnReenrollment": false
+      },
+      "Description": "GCP Certificate Manager `scope` for this certificate entry. Allowed: DEFAULT, ALL_REGIONS, EDGE_CACHE, CLIENT_AUTH. Immutable in GCP - cannot be changed after create. Inventory persists the existing scope back from GCP so renewals carry it forward automatically."
     }
-  ],
-  "EntryParameters": []
+  ]
 }
 '@
 

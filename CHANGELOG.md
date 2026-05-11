@@ -110,28 +110,41 @@ v1.2.0 - unreleased
   replacing the previous behavior of failing 700ms later with a wall-of-JSON
   HTTP 400 from GCP. See `JobBase.ValidateGcpCertificateId`.
 
-### Added (Scope custom property)
-- Added a new `Scope` custom store property that is honored by Management/Add.
-  Previous releases hard-coded `Scope = "DEFAULT"` on every certificate created
-  in GCP, which made the orchestrator unusable for environments that depend on
-  cross-region internal Application Load Balancers (`ALL_REGIONS`), Media CDN
-  (`EDGE_CACHE`), or mTLS trust-config / authorized-client server certs
-  (`CLIENT_AUTH`). Those customers had to pre-create empty placeholder
-  certificates in GCP via Terraform and then attach Keyfactor to the existing
-  shell. The new property lets a single store create certificates at any of
-  the four allowed scopes natively.
+### Added (Scope as entry parameter)
+- Added a new `Scope` **entry parameter** (per-certificate, not per-store) that
+  controls the GCP Certificate Manager `scope` value on each newly-created
+  certificate. Previous releases hard-coded `Scope = "DEFAULT"` and never read
+  scope back during Inventory, which made the orchestrator unusable for
+  environments that depend on cross-region internal Application Load Balancers
+  (`ALL_REGIONS`), Media CDN (`EDGE_CACHE`), or mTLS trust-config /
+  authorized-client server certs (`CLIENT_AUTH`). Those customers had to
+  pre-create empty placeholder certificates in GCP via Terraform with the right
+  scope and then attach Keyfactor to the existing shell.
+  - Modeled as `EntryParameters` (not `Properties`) because scope is per-cert
+    in GCP - a single (project, location) container can legitimately hold
+    certificates at different scopes. A single Keyfactor store can now hold a
+    mix of scopes without needing one store per scope.
+  - Rendered as a `MultipleChoice` dropdown in Command with the four allowed
+    values pre-populated, so typos cannot reach the orchestrator.
   - Allowed values: `DEFAULT`, `ALL_REGIONS`, `EDGE_CACHE`, `CLIENT_AUTH`.
-    Values are case-normalized (uppercased and trimmed) before validation.
-    Anything else fails the `ResolveScope` flow step before any API call.
-  - Default is `DEFAULT`. Blank also resolves to `DEFAULT`, so existing v1.1
-    and v1.2-pre-Scope stores keep working with no operator action.
+    `JobBase.ResolveScope` validates defence-in-depth: trims, uppercases,
+    rejects anything not in the set with a `[FAIL] ResolveScope` flow step
+    before any GCP API call.
+  - Default is `DEFAULT`. Blank, null, or missing all resolve to `DEFAULT`,
+    matching the pre-v1.2.1 behavior so existing stores upgrade with no
+    operator action.
+  - Inventory now reads each cert's actual `scope` from GCP's
+    `certificates.list` response and writes it into the cert's
+    `CurrentInventoryItem.Parameters` dict. GCP elides the field when the
+    cert is at `DEFAULT`; the orchestrator normalizes null/blank to `DEFAULT`
+    so Command always sees a concrete value. On subsequent renewals /
+    reenrollments Keyfactor replays the inventoried value into
+    `JobProperties`, so the cert keeps its scope through its lifecycle
+    automatically.
   - GCP's Scope field is **create-only and immutable**. Replace (overwrite)
     paths do not change scope: the `Patch` call's `UpdateMask` is `SelfManaged`,
     so GCP only updates the cert/key bytes. To change a certificate's scope,
     delete the certificate and re-add it.
-  - Recommended deployment pattern is one store per (project, location, scope)
-    tuple. Mixing scopes inside a single store is awkward because the property
-    is store-wide, not per-cert.
 
 ### Backwards compatibility
 - v1.1-shape stores (Store Path blank or `n/a`, Client Machine = Project ID,

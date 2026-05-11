@@ -212,6 +212,41 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
             }
         }
 
+        // GCP Certificate Manager's create-only Scope values. Anything else produces an
+        // HTTP 400 INVALID_ARGUMENT from the create call, so validate up front and reject
+        // typos with a clear message instead of letting them reach the API.
+        // Source: https://cloud.google.com/certificate-manager/docs/reference/rest/v1/projects.locations.certificates#Certificate.Scope
+        private static readonly System.Collections.Generic.HashSet<string> AllowedScopes =
+            new System.Collections.Generic.HashSet<string>(StringComparer.Ordinal)
+            {
+                "DEFAULT",
+                "EDGE_CACHE",
+                "ALL_REGIONS",
+                "CLIENT_AUTH"
+            };
+
+        /// <summary>
+        /// Normalize the per-store <c>Scope</c> custom property to a value GCP will
+        /// accept. Blank → <c>DEFAULT</c> (matches pre-v1.2 behavior, so unmigrated
+        /// stores keep working). Other values are uppercased and validated against the
+        /// set GCP allows; an unknown value throws <see cref="ArgumentException"/> so
+        /// the operator sees a clear failure before any API call.
+        /// </summary>
+        protected static string ResolveScope(string configuredScope)
+        {
+            if (string.IsNullOrWhiteSpace(configuredScope)) return "DEFAULT";
+
+            var normalized = configuredScope.Trim().ToUpperInvariant();
+            if (!AllowedScopes.Contains(normalized))
+            {
+                throw new ArgumentException(
+                    $"Unsupported Scope '{configuredScope}'. GCP Certificate Manager accepts only " +
+                    "DEFAULT, EDGE_CACHE, ALL_REGIONS, or CLIENT_AUTH. Edit the store's Scope custom property and retry.",
+                    nameof(configuredScope));
+            }
+            return normalized;
+        }
+
         private static string SuggestValidAlias(string alias)
         {
             if (string.IsNullOrEmpty(alias)) return "cert";

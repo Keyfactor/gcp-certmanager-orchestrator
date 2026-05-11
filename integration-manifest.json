@@ -62,7 +62,23 @@
                     ],
                     "ClientMachineDescription": "Display label for grouping certificate stores in Keyfactor Command. Recommended value is the GCP Organization ID (e.g. `1005564431893`); the orchestrator does not parse a project ID out of this field. The actual GCP project + location are read from Store Path.",
                     "StorePathDescription": "Canonical GCP resource path in the form `projects/{projectId}/locations/{location}` (e.g. `projects/edgecerts/locations/global`). This is the single source of truth for which Certificate Manager instance the store targets. For Discovery-approved stores Keyfactor Command auto-fills this from the discovered candidate; for manually-created stores the operator types it directly.",
-                    "EntryParameters": []
+                    "EntryParameters": [
+                        {
+                            "Name": "Scope",
+                            "DisplayName": "Certificate Scope",
+                            "Type": "MultipleChoice",
+                            "DependsOn": "",
+                            "DefaultValue": "DEFAULT",
+                            "Options": "DEFAULT,ALL_REGIONS,EDGE_CACHE,CLIENT_AUTH",
+                            "RequiredWhen": {
+                                "HasPrivateKey": false,
+                                "OnAdd": false,
+                                "OnRemove": false,
+                                "OnReenrollment": false
+                            },
+                            "Description": "GCP Certificate Manager `scope` for this certificate entry. Allowed: `DEFAULT` (global external Application Load Balancers), `ALL_REGIONS` (cross-region internal Application Load Balancers), `EDGE_CACHE` (Media CDN), `CLIENT_AUTH` (mTLS trust configs / authorized client server certs). **Immutable in GCP** - once a certificate is created with a given scope, GCP refuses to change it. Inventory persists the existing scope back from GCP so renewals carry it forward automatically. A single store can hold certs at different scopes (the field is per-entry, not store-wide)."
+                        }
+                    ]
                 }
             ]
         }

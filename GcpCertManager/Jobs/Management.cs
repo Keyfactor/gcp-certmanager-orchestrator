@@ -137,6 +137,21 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
             flow.Step("ValidateAlias", () => ValidateGcpCertificateId(CertificateName),
                 $"alias={CertificateName}");
 
+            // Resolve the per-entry Scope entry parameter up front. Scope is per-cert
+            // (not per-store) because GCP itself allows mixed-scope certs inside the same
+            // (project, location). The value lands in config.JobProperties from the
+            // Command UI dropdown; on renewals/reenrollments Keyfactor pre-fills it from
+            // the cert's last-known inventory Parameters, so the cert keeps its scope
+            // through its lifecycle without operator intervention.
+            string configuredScope = null;
+            if (config.JobProperties != null && config.JobProperties.TryGetValue("Scope", out var rawScope))
+            {
+                configuredScope = rawScope?.ToString();
+            }
+            string resolvedScope = null;
+            flow.Step("ResolveScope", () => resolvedScope = ResolveScope(configuredScope),
+                $"configured={configuredScope ?? "<blank>"}");
+
             var duplicate = false;
             flow.Step("CheckForDuplicate", () => duplicate = CheckForDuplicate(storePath, CertificateName, svc),
                 $"alias={CertificateName}");
@@ -219,15 +234,17 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
 
             // Build the GCP certificate object. Don't serialize+log; that would leak the
             // private key into trace logs.
+            //
+            // Scope comes from the per-entry "Scope" entry parameter and is honored only
+            // on Add. On Replace the patch's UpdateMask is "SelfManaged", so GCP ignores
+            // every other field on the body (including Scope) - which is correct, since
+            // GCP refuses to change scope on an existing cert anyway.
             var gCertificate = new Certificate
             {
                 SelfManaged = new SelfManagedCertificate { PemCertificate = pubCertPem, PemPrivateKey = privateKeyString },
                 Name = CertificateName,
                 Description = CertificateName,
-                // Scope does not come back in inventory, so hard-code it. Customers
-                // running edge-cache stores will need to override this in a future
-                // store-property if/when that scope becomes used.
-                Scope = "DEFAULT"
+                Scope = resolvedScope
             };
 
             if (duplicate && config.Overwrite)

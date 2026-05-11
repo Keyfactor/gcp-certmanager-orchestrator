@@ -129,7 +129,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                             Logger.LogTrace(
                                 "Building Cert List Inventory Item Alias: {Name} Pem: {Pem} Private Key: dummy (from PA API)",
                                 c.Name, c.PemCertificate);
-                            var item = BuildInventoryItem(c.Name, c.PemCertificate, true, storePath, svc);
+                            var item = BuildInventoryItem(c.Name, c.PemCertificate, true, storePath, svc, c.Scope);
                             if (item?.Certificates != null)
                                 inventoryItems.Add(item);
                         }
@@ -164,14 +164,20 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
         }
 
         protected virtual CurrentInventoryItem BuildInventoryItem(string alias, string certPem, bool privateKey,
-            string storePath, CertificateManagerService svc)
+            string storePath, CertificateManagerService svc, string scope)
         {
             try
             {
                 Logger.MethodEntry();
-                Logger.LogTrace("Alias: {Alias} Pem: {Pem} PrivateKey: {PrivateKey}", alias, certPem, privateKey);
+                Logger.LogTrace("Alias: {Alias} Pem: {Pem} PrivateKey: {PrivateKey} Scope: {Scope}",
+                    alias, certPem, privateKey, scope ?? "<null>");
 
                 var certAttributes = GetCertificateAttributes(storePath);
+                // GCP omits the scope field from the response when it's the default.
+                // Normalize null/blank to "DEFAULT" here so Command's UI always shows a
+                // concrete value on inventoried certs - and so that renewal jobs land a
+                // non-null Scope in JobProperties when Keyfactor replays the entry params.
+                certAttributes["Scope"] = string.IsNullOrWhiteSpace(scope) ? "DEFAULT" : scope;
                 var modAlias = alias.Split('/')[5];
                 Logger.LogTrace("Got modAlias: {ModAlias}", modAlias);
 

@@ -57,6 +57,6 @@
   <line x1="284" y1="210" x2="284" y2="248" stroke="#e8e8e8" stroke-width="1" />
   <line x1="444" y1="210" x2="444" y2="248" stroke="#e8e8e8" stroke-width="1" />
   <rect x="34" y="221" width="16" height="16" fill="#ffffff" stroke="#cccccc" rx="3" />
-  <text x="72" y="236" class="value">Service Account Key File Path (deprecated)</text>
+  <text x="72" y="236" class="value">Service Account Key File Path (dep...</text>
   <text x="292" y="236" class="value">String</text>
 </svg>

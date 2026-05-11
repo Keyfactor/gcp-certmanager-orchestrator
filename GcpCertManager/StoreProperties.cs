@@ -17,5 +17,13 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager
         public string ProjectId { get; set; }
 
         public string ServiceAccountKey { get; set; }
+
+        // GCP Certificate Manager's Scope field is create-only and immutable. Blank
+        // means "let JobBase.ResolveScope pick DEFAULT" so existing stores upgrade
+        // without operator intervention. Non-default scopes (ALL_REGIONS for
+        // cross-region internal ALBs, EDGE_CACHE for Media CDN, CLIENT_AUTH for
+        // mTLS trust configs) must be set per-store before the first Add.
+        [DefaultValue("")]
+        public string Scope { get; set; }
     }
 }

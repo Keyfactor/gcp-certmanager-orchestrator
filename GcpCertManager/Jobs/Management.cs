@@ -90,6 +90,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
             Logger.LogTrace("  Location: {Location}", storeProperties.Location);
             Logger.LogTrace("  Project Id: {ProjectId}", storeProperties.ProjectId);
             Logger.LogTrace("  Service Account Key Path: {ServiceAccountKey}", storeProperties.ServiceAccountKey);
+            Logger.LogTrace("  Scope: {Scope}", storeProperties.Scope);
 
             CertificateManagerService svc = null;
             flow.Step("GetGoogleCredentials", () =>
@@ -108,7 +109,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
             {
                 case CertStoreOperationType.Add:
                     flow.Branch("Add");
-                    try { return PerformAddition(svc, config, storePath, flow); }
+                    try { return PerformAddition(svc, config, storeProperties, storePath, flow); }
                     finally { flow.EndBranch(); }
                 case CertStoreOperationType.Remove:
                     flow.Branch("Remove");
@@ -129,13 +130,19 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
         }
 
         private JobResult PerformAddition(CertificateManagerService svc, ManagementJobConfiguration config,
-            string storePath, FlowLogger flow)
+            StoreProperties storeProperties, string storePath, FlowLogger flow)
         {
             // Validate the alias before any API calls or PFX parsing - GCP rejects
             // non-conforming IDs with HTTP 400 after we've already done the expensive
             // work, so failing fast saves both time and a confusing error message.
             flow.Step("ValidateAlias", () => ValidateGcpCertificateId(CertificateName),
                 $"alias={CertificateName}");
+
+            // Resolve the per-store Scope custom property up front. GCP's Scope field is
+            // create-only, so the value has to be correct before we touch the API.
+            string resolvedScope = null;
+            flow.Step("ResolveScope", () => resolvedScope = ResolveScope(storeProperties.Scope),
+                $"configured={storeProperties.Scope ?? "<blank>"}");
 
             var duplicate = false;
             flow.Step("CheckForDuplicate", () => duplicate = CheckForDuplicate(storePath, CertificateName, svc),
@@ -219,15 +226,17 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
 
             // Build the GCP certificate object. Don't serialize+log; that would leak the
             // private key into trace logs.
+            //
+            // Scope is sourced from the per-store custom property and is honored only on
+            // Add. On Replace the patch's UpdateMask is "SelfManaged", so GCP ignores
+            // every other field on the body (including Scope) - which is correct, since
+            // GCP rejects scope changes anyway.
             var gCertificate = new Certificate
             {
                 SelfManaged = new SelfManagedCertificate { PemCertificate = pubCertPem, PemPrivateKey = privateKeyString },
                 Name = CertificateName,
                 Description = CertificateName,
-                // Scope does not come back in inventory, so hard-code it. Customers
-                // running edge-cache stores will need to override this in a future
-                // store-property if/when that scope becomes used.
-                Scope = "DEFAULT"
+                Scope = resolvedScope
             };
 
             if (duplicate && config.Overwrite)

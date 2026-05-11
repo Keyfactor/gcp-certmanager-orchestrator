@@ -26,6 +26,13 @@
     <PackageReference Include="Keyfactor.Logging" Version="1.1.1" />
     <PackageReference Include="Keyfactor.Orchestrators.IOrchestratorJobExtensions" Version="0.7.0" />
     <PackageReference Include="Portable.BouncyCastle" Version="1.9.0" />
+    <!-- Transitive-dep override for GHSA-rxg9-xrhp-64gj (critical RCE).
+         Pulled in by Keyfactor.Logging -> System.DirectoryServices ->
+         System.Security.Permissions -> System.Windows.Extensions ->
+         System.Drawing.Common 5.0.0. Direct PackageReference wins over
+         transitive resolution. Remove this once Keyfactor.Logging
+         publishes a release that pins System.DirectoryServices to 8.x. -->
+    <PackageReference Include="System.Drawing.Common" Version="8.0.10" />
 
     <None Update="manifest.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>

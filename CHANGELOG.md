@@ -1,4 +1,4 @@
-v1.2.0 - unreleased
+v1.2.0
 - Added Discovery job (`CertStores.GcpCertMgr.Discovery`) that enumerates all
   GCP projects accessible to the orchestrator's service account and emits one
   candidate store path per (project, location) pair in canonical

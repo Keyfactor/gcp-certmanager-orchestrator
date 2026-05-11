@@ -85,6 +85,7 @@ That single value carries both the GCP project and the location (region or `glob
 | **Client Machine** | Display label only. Recommended: GCP Organization ID (e.g. `1005564431893`). Not parsed. | UI grouping in Command |
 | **Service Account Key File Path** (custom, *deprecated*) | v1.1 shape only. Leave blank for new stores - authentication uses Application Default Credentials. | Credential loader fallback; emits a deprecation warning when read |
 | **Location** (custom, *deprecated*) | v1.1 shape only. New stores leave it blank. Used as a fallback when Store Path is empty or `n/a`. | v1.1 fallback path; emits a deprecation warning when read |
+| **Certificate Scope** (custom) | GCP `scope` to apply to every new certificate created in this store. One of `DEFAULT`, `ALL_REGIONS`, `EDGE_CACHE`, `CLIENT_AUTH`. Blank → `DEFAULT`. Immutable on each cert once set in GCP - use one store per scope. See "Certificate scope" below. | Management/Add |
 
 ##### Location semantics: where the GCP region lives
 
@@ -130,6 +131,7 @@ Set:
 - **Store Path**: `projects/{projectId}/locations/{location}` - e.g. `projects/edgecerts/locations/global`
 - **Service Account Key File Path**: leave blank (deprecated; ADC is used)
 - **Location**: leave blank
+- **Certificate Scope**: `DEFAULT` for global external Application Load Balancers (the common case). Set to `ALL_REGIONS` if this store provisions certs for cross-region internal Application Load Balancers; `EDGE_CACHE` for Media CDN; `CLIENT_AUTH` for mTLS trust configs. See "Certificate scope" below.
 
 Authentication uses Application Default Credentials - see "Service account credentials" below.
 
@@ -144,6 +146,7 @@ After the discovery job runs, candidates appear in **Locations → Certificate S
 | **Application** | Optional, free-form. |
 | **Location** (custom) | Leave blank. Deprecated v1.1 field; the location is parsed from Store Path. |
 | **Service Account Key File Path** (custom) | Leave blank. Deprecated v1.1 field; authentication uses Application Default Credentials. |
+| **Certificate Scope** (custom) | Defaults to `DEFAULT`. Change only if this discovered store is going to back a non-default scope (`ALL_REGIONS`, `EDGE_CACHE`, `CLIENT_AUTH`) - Discovery does not know which scope your downstream load balancers need, so the operator sets it at approval time. Discovery emits one candidate per (project, location); if you need both `DEFAULT` and `ALL_REGIONS` certs in the same (project, location), reject this candidate and create two stores manually instead. See "Certificate scope" below. |
 | **Create Certificate Store If Missing** | **Check this.** Tells Command to create a new certificate store record from this candidate. Without it, the candidate sits in the discover tab with no store backing it. |
 | **Inventory Schedule** | Pick a cadence (e.g. Daily) for the inventory job to run after the store is created. |
 
@@ -212,6 +215,37 @@ GCP Certificate Manager constrains certificate resource IDs to a strict shape:
 - Regex: `[a-z]([-a-z0-9]*[a-z0-9])?`
 
 The orchestrator validates the alias against this rule **before** any API calls or PFX parsing during Management/Add. A non-conforming alias fails fast with a `[FAIL] ValidateAlias` step in the flow trace and a suggestion of a normalized alias (e.g. `Cert1` → `cert1`). Rename the certificate in Keyfactor Command to the suggested form and retry the Management/Add job.
+
+#### Certificate scope
+
+GCP Certificate Manager attaches a `scope` to every certificate that determines which load balancer / service families can consume it. The `Scope` custom store property tells the orchestrator which value to pass to GCP on create.
+
+| Value | What it is for |
+|---|---|
+| `DEFAULT` | Global external Application Load Balancers - the standard GCP load balancer for internet-facing traffic. This is the GCP default and the right answer for most stores. |
+| `ALL_REGIONS` | Cross-region **internal** Application Load Balancers. Use this when the consuming load balancer is regional/internal and replicated across regions. |
+| `EDGE_CACHE` | Google Cloud Media CDN edge-cache certs. |
+| `CLIENT_AUTH` | Certificates used by mTLS trust configs, or server certificates that are authorized for client authentication. |
+
+##### Immutability
+
+The `scope` field is **create-only** in the GCP API. Once GCP creates a certificate with a given scope, that scope cannot be changed by any patch operation. The orchestrator's Management/Replace path uses `UpdateMask = "SelfManaged"`, so re-adding a certificate over an existing one preserves its original scope - even if the store's Scope property has changed. To migrate a certificate to a different scope, delete it (Management/Remove) and re-add it with the new scope.
+
+This is why the recommended deployment pattern is **one store per (project, location, scope) tuple**. The Scope property is store-wide, not per-cert.
+
+##### What happened before v1.2.1
+
+Prior to v1.2.1 the orchestrator hard-coded `Scope = "DEFAULT"` on every certificate it created. Customers who needed non-default scopes (typically `ALL_REGIONS` for cross-region internal ALBs) had to pre-create empty placeholder certificate resources in GCP via Terraform with `scope = "ALL_REGIONS"`, then point Keyfactor at the existing resource as a Replace target. The new property removes that workaround: a store with Scope = `ALL_REGIONS` will create new certificate resources directly at the right scope.
+
+##### How the orchestrator validates the value
+
+`JobBase.ResolveScope` runs as the `ResolveScope` flow step on every Management/Add. It trims and uppercases the configured value, then validates it against the set GCP accepts. An unsupported value (typo, lowercase letters that don't normalize to a valid token, anything outside the four allowed values) fails with `[FAIL] ResolveScope` and a clear message naming the four legal values. Blank or null resolves to `DEFAULT`.
+
+##### Quick reference
+
+- "Where do I see what scope a certificate ended up with?" → GCP's Certificate Manager Console, or `gcloud certificate-manager certificates describe <name> --location=<loc> --project=<proj>`. The orchestrator's Inventory job does not surface scope today.
+- "Can I change a certificate's scope?" → No. Delete and re-add.
+- "I have one store with DEFAULT certs and I want to add an ALL_REGIONS cert" → Create a second store with the same (project, location) but Scope = `ALL_REGIONS`.
 
 #### Architecture and logging
 
@@ -345,6 +379,7 @@ the Keyfactor Command Portal
    | ---- | ------------ | ---- | --------------------- | -------- | ----------- |
    | Location | Location (deprecated) | **Deprecated in v1.2.** The GCP location is parsed from Store Path. Leave blank for new stores. v1.1-shape stores (where Store Path is blank or `n/a`) still read this value as a fallback; expect a deprecation warning in the orchestrator log when that path is used. | String |  | 🔲 Unchecked |
    | ServiceAccountKey | Service Account Key File Path (deprecated) | **Deprecated in v1.2.** Leave blank. Authenticate via Application Default Credentials instead (set `GOOGLE_APPLICATION_CREDENTIALS` as a machine-level environment variable on the orchestrator host pointing at the JSON key, or run on a GCE VM / GKE pod with workload identity). The Discovery job has no way to surface this custom property in Keyfactor Command's discovery-job UI, so ADC is the only mechanism that works uniformly across all four job types. v1.1 stores that have this populated continue to work via a deprecation-logged fallback; the field is scheduled for removal in v2.0. | String |  | 🔲 Unchecked |
+   | Scope | Certificate Scope | GCP Certificate Manager `scope` value applied to every new certificate created in this store. Allowed: `DEFAULT` (global external Application Load Balancers - the GCP default), `ALL_REGIONS` (cross-region internal Application Load Balancers), `EDGE_CACHE` (Media CDN), `CLIENT_AUTH` (mTLS trust configs / authorized client server certs). **Immutable in GCP** - once a certificate is created with a given scope, GCP refuses to change it. To use a different scope, delete and re-add the certificate. Pick the scope that matches the load balancer / service this store provisions certs for, and use one store per scope. Leave blank or set to `DEFAULT` for the legacy behavior. | String | DEFAULT | 🔲 Unchecked |
 
    The Custom Fields tab should look like this:
 
@@ -360,6 +395,12 @@ the Keyfactor Command Portal
    **Deprecated in v1.2.** Leave blank. Authenticate via Application Default Credentials instead (set `GOOGLE_APPLICATION_CREDENTIALS` as a machine-level environment variable on the orchestrator host pointing at the JSON key, or run on a GCE VM / GKE pod with workload identity). The Discovery job has no way to surface this custom property in Keyfactor Command's discovery-job UI, so ADC is the only mechanism that works uniformly across all four job types. v1.1 stores that have this populated continue to work via a deprecation-logged fallback; the field is scheduled for removal in v2.0.
 
    ![GcpCertMgr Custom Field - ServiceAccountKey](docsource/images/GcpCertMgr-custom-field-ServiceAccountKey-dialog.svg)
+
+
+   ###### Certificate Scope
+   GCP Certificate Manager `scope` value applied to every new certificate created in this store. Allowed: `DEFAULT` (global external Application Load Balancers - the GCP default), `ALL_REGIONS` (cross-region internal Application Load Balancers), `EDGE_CACHE` (Media CDN), `CLIENT_AUTH` (mTLS trust configs / authorized client server certs). **Immutable in GCP** - once a certificate is created with a given scope, GCP refuses to change it. To use a different scope, delete and re-add the certificate. Pick the scope that matches the load balancer / service this store provisions certs for, and use one store per scope. Leave blank or set to `DEFAULT` for the legacy behavior.
+
+   ![GcpCertMgr Custom Field - Scope](docsource/images/GcpCertMgr-custom-field-Scope-dialog.svg)
 
 
    </details>
@@ -424,6 +465,7 @@ the Keyfactor Command Portal
    | Orchestrator | Select an approved orchestrator capable of managing `GcpCertMgr` certificates. Specifically, one with the `GcpCertMgr` capability. |
    | Location | **Deprecated in v1.2.** The GCP location is parsed from Store Path. Leave blank for new stores. v1.1-shape stores (where Store Path is blank or `n/a`) still read this value as a fallback; expect a deprecation warning in the orchestrator log when that path is used. |
    | ServiceAccountKey | **Deprecated in v1.2.** Leave blank. Authenticate via Application Default Credentials instead (set `GOOGLE_APPLICATION_CREDENTIALS` as a machine-level environment variable on the orchestrator host pointing at the JSON key, or run on a GCE VM / GKE pod with workload identity). The Discovery job has no way to surface this custom property in Keyfactor Command's discovery-job UI, so ADC is the only mechanism that works uniformly across all four job types. v1.1 stores that have this populated continue to work via a deprecation-logged fallback; the field is scheduled for removal in v2.0. |
+   | Scope | GCP Certificate Manager `scope` value applied to every new certificate created in this store. Allowed: `DEFAULT` (global external Application Load Balancers - the GCP default), `ALL_REGIONS` (cross-region internal Application Load Balancers), `EDGE_CACHE` (Media CDN), `CLIENT_AUTH` (mTLS trust configs / authorized client server certs). **Immutable in GCP** - once a certificate is created with a given scope, GCP refuses to change it. To use a different scope, delete and re-add the certificate. Pick the scope that matches the load balancer / service this store provisions certs for, and use one store per scope. Leave blank or set to `DEFAULT` for the legacy behavior. |
 
 </details>
 
@@ -449,6 +491,7 @@ the Keyfactor Command Portal
    | Orchestrator | Select an approved orchestrator capable of managing `GcpCertMgr` certificates. Specifically, one with the `GcpCertMgr` capability. |
    | Properties.Location | **Deprecated in v1.2.** The GCP location is parsed from Store Path. Leave blank for new stores. v1.1-shape stores (where Store Path is blank or `n/a`) still read this value as a fallback; expect a deprecation warning in the orchestrator log when that path is used. |
    | Properties.ServiceAccountKey | **Deprecated in v1.2.** Leave blank. Authenticate via Application Default Credentials instead (set `GOOGLE_APPLICATION_CREDENTIALS` as a machine-level environment variable on the orchestrator host pointing at the JSON key, or run on a GCE VM / GKE pod with workload identity). The Discovery job has no way to surface this custom property in Keyfactor Command's discovery-job UI, so ADC is the only mechanism that works uniformly across all four job types. v1.1 stores that have this populated continue to work via a deprecation-logged fallback; the field is scheduled for removal in v2.0. |
+   | Properties.Scope | GCP Certificate Manager `scope` value applied to every new certificate created in this store. Allowed: `DEFAULT` (global external Application Load Balancers - the GCP default), `ALL_REGIONS` (cross-region internal Application Load Balancers), `EDGE_CACHE` (Media CDN), `CLIENT_AUTH` (mTLS trust configs / authorized client server certs). **Immutable in GCP** - once a certificate is created with a given scope, GCP refuses to change it. To use a different scope, delete and re-add the certificate. Pick the scope that matches the load balancer / service this store provisions certs for, and use one store per scope. Leave blank or set to `DEFAULT` for the legacy behavior. |
 
 3. **Import the CSV file to create the certificate stores**
 

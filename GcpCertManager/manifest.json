@@ -8,6 +8,10 @@
       "CertStores.GcpCertMgr.Management": {
         "assemblypath": "GcpCertManager.dll",
         "TypeFullName": "Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs.Management"
+      },
+      "CertStores.GcpCertMgr.Discovery": {
+        "assemblypath": "GcpCertManager.dll",
+        "TypeFullName": "Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs.Discovery"
       }
     }
   }

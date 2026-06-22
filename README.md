@@ -2,13 +2,12 @@
     Google Cloud Provider Certificate Manager Universal Orchestrator Extension
 </h1>
 
-
 <p align="center">
   <!-- Badges -->
 <img src="https://img.shields.io/badge/integration_status-production-3D1973?style=flat-square" alt="Integration Status: production" />
-<a href="https://github.com/Keyfactor/Google Cloud Provider Certificate Manager/releases"><img src="https://img.shields.io/github/v/release/Keyfactor/Google Cloud Provider Certificate Manager?style=flat-square" alt="Release" /></a>
-<img src="https://img.shields.io/github/issues/Keyfactor/Google Cloud Provider Certificate Manager?style=flat-square" alt="Issues" />
-<img src="https://img.shields.io/github/downloads/Keyfactor/Google Cloud Provider Certificate Manager/total?style=flat-square&label=downloads&color=28B905" alt="GitHub Downloads (all assets, all releases)" />
+<a href="https://github.com/Keyfactor/gcp-certmanager-orchestrator/releases"><img src="https://img.shields.io/github/v/release/Keyfactor/gcp-certmanager-orchestrator?style=flat-square" alt="Release" /></a>
+<img src="https://img.shields.io/github/issues/Keyfactor/gcp-certmanager-orchestrator?style=flat-square" alt="Issues" />
+<img src="https://img.shields.io/github/downloads/Keyfactor/gcp-certmanager-orchestrator/total?style=flat-square&label=downloads&color=28B905" alt="GitHub Downloads (all assets, all releases)" />
 </p>
 
 <p align="center">
@@ -429,9 +428,9 @@ the Keyfactor Command Portal
 
 1. **Download the latest Google Cloud Provider Certificate Manager Universal Orchestrator extension from GitHub.**
 
-    Navigate to the [Google Cloud Provider Certificate Manager Universal Orchestrator extension GitHub version page](https://github.com/Keyfactor/Google Cloud Provider Certificate Manager/releases/latest). Refer to the compatibility matrix below to determine which asset should be downloaded. Then, click the corresponding asset to download the zip archive.
+    Navigate to the [Google Cloud Provider Certificate Manager Universal Orchestrator extension GitHub version page](https://github.com/Keyfactor/gcp-certmanager-orchestrator/releases/latest). Refer to the compatibility matrix below to determine which asset should be downloaded. Then, click the corresponding asset to download the zip archive.
 
-   | Universal Orchestrator Version | Latest .NET version installed on the Universal Orchestrator server | `rollForward` condition in `Orchestrator.runtimeconfig.json` | `Google Cloud Provider Certificate Manager` .NET version to download |
+   | Universal Orchestrator Version | Latest .NET version installed on the Universal Orchestrator server | `rollForward` condition in `Orchestrator.runtimeconfig.json` | `gcp-certmanager-orchestrator` .NET version to download |
    | --------- | ----------- | ----------- | ----------- |
    | Older than `11.0.0` | | | `net6.0` |
    | Between `11.0.0` and `11.5.1` (inclusive) | `net6.0` | | `net6.0` |
@@ -450,10 +449,10 @@ the Keyfactor Command Portal
 
 3. **Create a new directory for the Google Cloud Provider Certificate Manager Universal Orchestrator extension inside the extensions directory.**
 
-    Create a new directory called `Google Cloud Provider Certificate Manager`.
+    Create a new directory called `gcp-certmanager-orchestrator`.
     > The directory name does not need to match any names used elsewhere; it just has to be unique within the extensions directory.
 
-4. **Copy the contents of the downloaded and unzipped assemblies from __step 2__ to the `Google Cloud Provider Certificate Manager` directory.**
+4. **Copy the contents of the downloaded and unzipped assemblies from __step 2__ to the `gcp-certmanager-orchestrator` directory.**
 
 5. **Restart the Universal Orchestrator service.**
 

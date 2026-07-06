@@ -220,17 +220,41 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                 }
             });
 
-            var pubCertPem = Pemify(Convert.ToBase64String(p.GetCertificate(alias).Certificate.GetEncoded()));
+            var certificateEntries = p.GetCertificateChain(alias);
+            var certificatePemBuilder = new StringBuilder();
+
+            if (certificateEntries != null && certificateEntries.Length > 0)
+            {
+                foreach (var certificateEntry in certificateEntries)
+                {
+                    if (certificateEntry?.Certificate == null)
+                    {
+                        continue;
+                    }
+
+                    certificatePemBuilder.Append(certStart);
+                    certificatePemBuilder.Append(Pemify(Convert.ToBase64String(certificateEntry.Certificate.GetEncoded())));
+                    certificatePemBuilder.Append(certEnd);
+                    certificatePemBuilder.Append("\r\n");
+                }
+            }
+            else
+            {
+                var leafCertificate = p.GetCertificate(alias).Certificate;
+                certificatePemBuilder.Append(certStart);
+                certificatePemBuilder.Append(Pemify(Convert.ToBase64String(leafCertificate.GetEncoded())));
+                certificatePemBuilder.Append(certEnd);
+            }
+
+            var pubCertPem = certificatePemBuilder.ToString().TrimEnd('\r', '\n');
             // Don't log private key material - only the public chain + alias.
             Logger.LogTrace("Public cert PEM extracted for alias {Alias}", alias);
 
             // Note: certPem includes the (decrypted) private key. It is intentionally NOT
             // logged. The variable is retained because the legacy code computed it inline;
             // the actual upload below uses pubCertPem + privateKeyString separately.
-            var certPem = privateKeyString + certStart + pubCertPem + certEnd;
+            var certPem = privateKeyString + pubCertPem;
             _ = certPem;
-
-            pubCertPem = $"-----BEGIN CERTIFICATE-----\r\n{pubCertPem}\r\n-----END CERTIFICATE-----";
 
             // Build the GCP certificate object. Don't serialize+log; that would leak the
             // private key into trace logs.

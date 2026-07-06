@@ -5,6 +5,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions
 // and limitations under the License.
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -152,6 +153,19 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
             flow.Step("ResolveScope", () => resolvedScope = ResolveScope(configuredScope),
                 $"configured={configuredScope ?? "<blank>"}");
 
+            // Resolve the per-entry "labels" entry parameter: a comma delimited list of
+            // key:value pairs (e.g. "env:prod,team:pki"). Inventory pre-fills this from the
+            // cert's existing GCP labels on renewals/reenrollments, so labels persist through
+            // the cert's lifecycle unless the operator edits the field.
+            string configuredLabels = null;
+            if (config.JobProperties != null && config.JobProperties.TryGetValue("labels", out var rawLabels))
+            {
+                configuredLabels = rawLabels?.ToString();
+            }
+            var resolvedLabels = ParseLabels(configuredLabels);
+            flow.Step("ResolveLabels",
+                $"configured={configuredLabels ?? "<blank>"}, count={resolvedLabels.Count}");
+
             var duplicate = false;
             flow.Step("CheckForDuplicate", () => duplicate = CheckForDuplicate(storePath, CertificateName, svc),
                 $"alias={CertificateName}");
@@ -260,15 +274,17 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
             // private key into trace logs.
             //
             // Scope comes from the per-entry "Scope" entry parameter and is honored only
-            // on Add. On Replace the patch's UpdateMask is "SelfManaged", so GCP ignores
-            // every other field on the body (including Scope) - which is correct, since
-            // GCP refuses to change scope on an existing cert anyway.
+            // on Add. On Replace the patch's UpdateMask is "SelfManaged,labels", so GCP
+            // ignores every other field on the body (including Scope) - which is correct,
+            // since GCP refuses to change scope on an existing cert anyway. Labels, unlike
+            // Scope, are mutable in GCP so they're carried on both Add and Replace.
             var gCertificate = new Certificate
             {
                 SelfManaged = new SelfManagedCertificate { PemCertificate = pubCertPem, PemPrivateKey = privateKeyString },
                 Name = CertificateName,
                 Description = CertificateName,
-                Scope = resolvedScope
+                Scope = resolvedScope,
+                Labels = resolvedLabels
             };
 
             if (duplicate && config.Overwrite)
@@ -299,7 +315,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
         private void ReplaceCertificate(Certificate gCertificate, CertificateManagerService svc, string storePath, FlowLogger flow)
         {
             var replaceCertificateRequest = svc.Projects.Locations.Certificates.Patch(gCertificate, storePath + $"/certificates/{CertificateName}");
-            replaceCertificateRequest.UpdateMask = "SelfManaged";
+            replaceCertificateRequest.UpdateMask = "SelfManaged,labels";
 
             var replaceCertificateResponse = replaceCertificateRequest.Execute();
             flow.Step("WaitForOperation-Replace", () => WaitForOperation(svc, replaceCertificateResponse.Name),

@@ -129,7 +129,7 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                             Logger.LogTrace(
                                 "Building Cert List Inventory Item Alias: {Name} Pem: {Pem} Private Key: dummy (from PA API)",
                                 c.Name, c.PemCertificate);
-                            var item = BuildInventoryItem(c.Name, c.PemCertificate, true, storePath, svc, c.Scope);
+                            var item = BuildInventoryItem(c.Name, c.PemCertificate, true, storePath, svc, c.Scope, c.Labels);
                             if (item?.Certificates != null)
                                 inventoryItems.Add(item);
                         }
@@ -164,13 +164,13 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
         }
 
         protected virtual CurrentInventoryItem BuildInventoryItem(string alias, string certPem, bool privateKey,
-            string storePath, CertificateManagerService svc, string scope)
+            string storePath, CertificateManagerService svc, string scope, IDictionary<string, string> labels)
         {
             try
             {
                 Logger.MethodEntry();
-                Logger.LogTrace("Alias: {Alias} Pem: {Pem} PrivateKey: {PrivateKey} Scope: {Scope}",
-                    alias, certPem, privateKey, scope ?? "<null>");
+                Logger.LogTrace("Alias: {Alias} Pem: {Pem} PrivateKey: {PrivateKey} Scope: {Scope} Labels: {Labels}",
+                    alias, certPem, privateKey, scope ?? "<null>", labels?.Count ?? 0);
 
                 var certAttributes = GetCertificateAttributes(storePath);
                 // GCP omits the scope field from the response when it's the default.
@@ -178,6 +178,9 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                 // concrete value on inventoried certs - and so that renewal jobs land a
                 // non-null Scope in JobProperties when Keyfactor replays the entry params.
                 certAttributes["Scope"] = string.IsNullOrWhiteSpace(scope) ? "DEFAULT" : scope;
+                // Round-trip existing GCP labels back into the "labels" entry parameter so
+                // renewals/reenrollments carry them forward automatically.
+                certAttributes["labels"] = FormatLabels(labels);
                 var modAlias = alias.Split('/')[5];
                 Logger.LogTrace("Got modAlias: {ModAlias}", modAlias);
 

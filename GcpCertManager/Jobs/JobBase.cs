@@ -13,6 +13,8 @@
 // limitations under the License.
 
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 using Google;
 using Keyfactor.Orchestrators.Common.Enums;
@@ -245,6 +247,40 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
                     nameof(configuredScope));
             }
             return normalized;
+        }
+
+        /// <summary>
+        /// Parses the "labels" entry parameter - a comma delimited list of
+        /// <c>key:value</c> pairs (e.g. <c>env:prod,team:pki</c>) - into a label map
+        /// suitable for <see cref="Google.Apis.CertificateManager.v1.Data.Certificate.Labels"/>.
+        /// Pairs are split on the first colon only, so values containing a colon (e.g. a
+        /// URL) are preserved. Malformed pairs (no colon) are silently dropped rather than
+        /// failing the job. Returns an empty dictionary for null/blank input.
+        /// </summary>
+        protected static IDictionary<string, string> ParseLabels(string labels)
+        {
+            if (string.IsNullOrWhiteSpace(labels)) return new Dictionary<string, string>();
+
+            return labels.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(pair => pair.Split(new[] { ':' }, 2))
+                .Where(parts => parts.Length == 2)
+                .Select(parts => (Key: parts[0].Trim(), Value: parts[1].Trim()))
+                .Where(kv => kv.Key.Length > 0)
+                .GroupBy(kv => kv.Key, StringComparer.Ordinal)
+                .ToDictionary(g => g.Key, g => g.Last().Value, StringComparer.Ordinal);
+        }
+
+        /// <summary>
+        /// Formats a GCP label map back into the same comma delimited <c>key:value</c>
+        /// string shape consumed by <see cref="ParseLabels"/>, so Inventory can round-trip
+        /// existing labels back into the "labels" entry parameter. Returns an empty string
+        /// for a null/empty map.
+        /// </summary>
+        protected static string FormatLabels(IDictionary<string, string> labels)
+        {
+            if (labels == null || labels.Count == 0) return string.Empty;
+
+            return string.Join(",", labels.Select(kv => $"{kv.Key}:{kv.Value}"));
         }
 
         private static string SuggestValidAlias(string alias)

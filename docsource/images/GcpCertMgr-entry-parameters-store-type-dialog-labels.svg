@@ -25,24 +25,24 @@
   </g>
   <text x="20" y="110" class="label">Name</text>
   <rect x="20" y="113" width="660" height="36" fill="#ffffff" stroke="#cccccc" rx="4" />
-  <text x="30" y="138" class="value">Scope</text>
+  <text x="30" y="138" class="value">labels</text>
   <text x="20" y="173" class="label">Display Name</text>
   <rect x="20" y="176" width="660" height="36" fill="#ffffff" stroke="#cccccc" rx="4" />
-  <text x="30" y="201" class="value">Certificate Scope</text>
+  <text x="30" y="201" class="value">Labels</text>
   <text x="20" y="236" class="label">Type</text>
   <rect x="20" y="239" width="660" height="36" fill="#e8e8e8" stroke="#cccccc" rx="4" />
-  <text x="30" y="264" class="value">MultipleChoice</text>
+  <text x="30" y="264" class="value">String</text>
   <text x="666" y="265" font-size="12" fill="#666666" font-family="'Segoe UI', Arial, sans-serif">∨</text>
   <text x="20" y="299" class="label">Default Value</text>
   <rect x="20" y="302" width="660" height="36" fill="#ffffff" stroke="#cccccc" rx="4" />
-  <text x="30" y="327" class="value">DEFAULT</text>
+  <text x="30" y="327" class="value"></text>
   <text x="20" y="362" class="label">Multiple Choice Options</text>
-  <rect x="20" y="365" width="660" height="36" fill="#ffffff" stroke="#cccccc" rx="4" />
-  <text x="30" y="390" class="value">DEFAULT,ALL_REGIONS,EDGE_CACHE,CLIENT_AUTH</text>
+  <rect x="20" y="365" width="660" height="36" fill="#e0e0e0" stroke="#cccccc" rx="4" />
+  <text x="30" y="390" class="value"></text>
   <text x="20" y="425" class="label">Depends On</text>
   <rect x="20" y="438" width="15" height="15" fill="#ffffff" stroke="#cccccc" rx="2" />
   <rect x="43" y="428" width="637" height="36" fill="#e8e8e8" stroke="#cccccc" rx="4" />
-  <text x="53" y="453" class="value">Labels</text>
+  <text x="53" y="453" class="value">Certificate Scope</text>
   <text x="666" y="454" font-size="12" fill="#666666" font-family="'Segoe UI', Arial, sans-serif">∨</text>
   <line x1="0" y1="480" x2="700" y2="480" stroke="#e0e0e0" stroke-width="1" />
   <rect x="500" y="492" width="90" height="36" fill="#ffffff" stroke="#cccccc" rx="4" />

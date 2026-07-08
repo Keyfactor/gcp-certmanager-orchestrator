@@ -1,3 +1,5 @@
+v1.3.0
+
 v1.2.0
 - Added Discovery job (`CertStores.GcpCertMgr.Discovery`) that enumerates all
   GCP projects accessible to the orchestrator's service account and emits one

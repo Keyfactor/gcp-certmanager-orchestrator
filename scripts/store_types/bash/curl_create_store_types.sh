@@ -74,6 +74,20 @@ curl -s -X POST "https://${KEYFACTOR_HOSTNAME}/${KEYFACTOR_API_PATH}/Certificate
         "OnReenrollment": false
       },
       "Description": "GCP Certificate Manager `scope` for this certificate entry. Allowed: `DEFAULT` (global external Application Load Balancers), `ALL_REGIONS` (cross-region internal Application Load Balancers), `EDGE_CACHE` (Media CDN), `CLIENT_AUTH` (mTLS trust configs / authorized client server certs). **Immutable in GCP** - once a certificate is created with a given scope, GCP refuses to change it. Inventory persists the existing scope back from GCP so renewals carry it forward automatically. A single store can hold certs at different scopes (the field is per-entry, not store-wide)."
+    },
+    {
+      "Name": "labels",
+      "DisplayName": "Labels",
+      "Type": "String",
+      "DependsOn": "",
+      "DefaultValue": "",
+      "RequiredWhen": {
+        "HasPrivateKey": false,
+        "OnAdd": false,
+        "OnRemove": false,
+        "OnReenrollment": false
+      },
+      "Description": "An optional list of one-to-many comma delimited label key:value pairs to assign to the certificate. Values should be entered as key1:value1,key2:value2,...,keyN:valueN. Inventory persists the certificate's existing GCP labels back into this field so renewals carry them forward automatically."
     }
   ]
 }'

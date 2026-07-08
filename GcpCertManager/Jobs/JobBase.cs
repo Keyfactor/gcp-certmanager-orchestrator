@@ -283,6 +283,52 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
             return string.Join(",", labels.Select(kv => $"{kv.Key}:{kv.Value}"));
         }
 
+        // GCP Certificate Manager label keys/values must match:
+        //   [a-z0-9_-]{0,63}     (key additionally must be non-empty)
+        // i.e. lowercase letters, digits, underscores, hyphens only - no uppercase, no
+        // other punctuation - and 63 characters or fewer. A map may have at most 64
+        // labels. The API rejects anything else with HTTP 400 INVALID_ARGUMENT.
+        // Source: https://cloud.google.com/certificate-manager/docs/reference/rest/v1/projects.locations.certificates#Certificate
+        // (labels field) and https://cloud.google.com/resource-manager/docs/creating-managing-labels#requirements
+        private static readonly Regex GcpLabelPattern = new Regex(
+            @"^[a-z0-9_-]{0,63}$",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+        private const int MaxLabelCount = 64;
+
+        /// <summary>
+        /// Throws <see cref="ArgumentException"/> when <paramref name="labels"/> contains
+        /// keys/values that GCP Certificate Manager would reject, or exceeds GCP's 64-label
+        /// limit. Call this before making any Add/Replace API call so the operator sees a
+        /// clear error in the flow trace instead of a 400 wall-of-JSON from GCP.
+        /// </summary>
+        protected static void ValidateLabels(IDictionary<string, string> labels)
+        {
+            if (labels == null || labels.Count == 0) return;
+
+            if (labels.Count > MaxLabelCount)
+                throw new ArgumentException(
+                    $"GCP Certificate Manager allows at most {MaxLabelCount} labels per certificate; got {labels.Count}.",
+                    nameof(labels));
+
+            foreach (var kv in labels)
+            {
+                if (string.IsNullOrEmpty(kv.Key) || !GcpLabelPattern.IsMatch(kv.Key))
+                    throw new ArgumentException(
+                        $"GCP Certificate Manager rejects the label key '{kv.Key}'. Keys must match [a-z0-9_-]{{1,63}} - " +
+                        "lowercase letters, digits, underscores, and hyphens only, 1-63 characters. " +
+                        "Fix the store/entry \"labels\" parameter and retry.",
+                        nameof(labels));
+
+                if (kv.Value != null && !GcpLabelPattern.IsMatch(kv.Value))
+                    throw new ArgumentException(
+                        $"GCP Certificate Manager rejects the value '{kv.Value}' for label '{kv.Key}'. Values must match " +
+                        "[a-z0-9_-]{0,63} - lowercase letters, digits, underscores, and hyphens only, up to 63 characters. " +
+                        "Fix the store/entry \"labels\" parameter and retry.",
+                        nameof(labels));
+            }
+        }
+
         private static string SuggestValidAlias(string alias)
         {
             if (string.IsNullOrEmpty(alias)) return "cert";

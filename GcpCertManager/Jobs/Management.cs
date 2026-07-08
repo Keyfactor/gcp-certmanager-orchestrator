@@ -166,6 +166,12 @@ namespace Keyfactor.Extensions.Orchestrator.GcpCertManager.Jobs
             flow.Step("ResolveLabels",
                 $"configured={configuredLabels ?? "<blank>"}, count={resolvedLabels.Count}");
 
+            // Validate labels before any API call - GCP rejects non-conforming keys/values
+            // with HTTP 400 after we've already done the expensive PFX work, so failing
+            // fast here saves both time and a confusing error message.
+            flow.Step("ValidateLabels", () => ValidateLabels(resolvedLabels),
+                $"count={resolvedLabels.Count}");
+
             var duplicate = false;
             flow.Step("CheckForDuplicate", () => duplicate = CheckForDuplicate(storePath, CertificateName, svc),
                 $"alias={CertificateName}");

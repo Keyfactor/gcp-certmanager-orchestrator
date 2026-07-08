@@ -1,4 +1,6 @@
 v1.3.0
+- Add support for attaching labels to cerificates
+- Add entire certificate chain (if passed by Command) along with the leaf certificate when adding/replacing certificates in GCP Certificate Manager.  Previously, only leaf certificate was added.
 
 v1.2.0
 - Added Discovery job (`CertStores.GcpCertMgr.Discovery`) that enumerates all

@@ -5,9 +5,9 @@
 <p align="center">
   <!-- Badges -->
 <img src="https://img.shields.io/badge/integration_status-production-3D1973?style=flat-square" alt="Integration Status: production" />
-<a href="https://github.com/Keyfactor/Google Cloud Provider Certificate Manager/releases"><img src="https://img.shields.io/github/v/release/Keyfactor/Google Cloud Provider Certificate Manager?style=flat-square" alt="Release" /></a>
-<img src="https://img.shields.io/github/issues/Keyfactor/Google Cloud Provider Certificate Manager?style=flat-square" alt="Issues" />
-<img src="https://img.shields.io/github/downloads/Keyfactor/Google Cloud Provider Certificate Manager/total?style=flat-square&label=downloads&color=28B905" alt="GitHub Downloads (all assets, all releases)" />
+<a href="https://github.com/Keyfactor/gcp-certmanager-orchestrator/releases"><img src="https://img.shields.io/github/v/release/Keyfactor/gcp-certmanager-orchestrator?style=flat-square" alt="Release" /></a>
+<img src="https://img.shields.io/github/issues/Keyfactor/gcp-certmanager-orchestrator?style=flat-square" alt="Issues" />
+<img src="https://img.shields.io/github/downloads/Keyfactor/gcp-certmanager-orchestrator/total?style=flat-square&label=downloads&color=28B905" alt="GitHub Downloads (all assets, all releases)" />
 </p>
 
 <p align="center">
@@ -411,6 +411,7 @@ the Keyfactor Command Portal
    | Name | Display Name | Description | Type | Default Value | Entry has a private key | Adding an entry | Removing an entry | Reenrolling an entry |
    | ---- | ------------ | ---- | ------------- | ----------------------- | ---------------- | ----------------- | ------------------- | ----------- |
    | Scope | Certificate Scope | GCP Certificate Manager `scope` for this certificate entry. Allowed: `DEFAULT` (global external Application Load Balancers), `ALL_REGIONS` (cross-region internal Application Load Balancers), `EDGE_CACHE` (Media CDN), `CLIENT_AUTH` (mTLS trust configs / authorized client server certs). **Immutable in GCP** - once a certificate is created with a given scope, GCP refuses to change it. Inventory persists the existing scope back from GCP so renewals carry it forward automatically. A single store can hold certs at different scopes (the field is per-entry, not store-wide). | MultipleChoice | DEFAULT | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
+   | labels | Labels | An optional list of one-to-many comma delimited label key:value pairs to assign to the certificate. Values should be entered as key1:value1,key2:value2,...,keyN:valueN. Inventory persists the certificate's existing GCP labels back into this field so renewals carry them forward automatically. | String |  | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
 
    The Entry Parameters tab should look like this:
 
@@ -422,25 +423,30 @@ the Keyfactor Command Portal
    ![GcpCertMgr Entry Parameter - Scope](docsource/images/GcpCertMgr-entry-parameters-store-type-dialog-Scope-validation-options.svg)
 
 
+   ##### Labels
+   An optional list of one-to-many comma delimited label key:value pairs to assign to the certificate. Values should be entered as key1:value1,key2:value2,...,keyN:valueN. Inventory persists the certificate's existing GCP labels back into this field so renewals carry them forward automatically.
+
+   ![GcpCertMgr Entry Parameter - labels](docsource/images/GcpCertMgr-entry-parameters-store-type-dialog-labels.svg)
+   ![GcpCertMgr Entry Parameter - labels](docsource/images/GcpCertMgr-entry-parameters-store-type-dialog-labels-validation-options.svg)
+
+
    </details>
 
 ## Installation
 
 1. **Download the latest Google Cloud Provider Certificate Manager Universal Orchestrator extension from GitHub.**
 
-    Navigate to the [Google Cloud Provider Certificate Manager Universal Orchestrator extension GitHub version page](https://github.com/Keyfactor/Google Cloud Provider Certificate Manager/releases/latest). Refer to the compatibility matrix below to determine which asset should be downloaded. Then, click the corresponding asset to download the zip archive.
+    Navigate to the [Google Cloud Provider Certificate Manager Universal Orchestrator extension GitHub version page](https://github.com/Keyfactor/gcp-certmanager-orchestrator/releases/latest). Refer to the compatibility matrix below to determine which asset should be downloaded. Then, click the corresponding asset to download the zip archive.
 
-   | Universal Orchestrator Version | Latest .NET version installed on the Universal Orchestrator server | `rollForward` condition in `Orchestrator.runtimeconfig.json` | `Google Cloud Provider Certificate Manager` .NET version to download |
+   | Universal Orchestrator Version | Latest .NET version installed on the Universal Orchestrator server | `rollForward` condition in `Orchestrator.runtimeconfig.json` | `gcp-certmanager-orchestrator` .NET version to download |
    | --------- | ----------- | ----------- | ----------- |
-   | Older than `11.0.0` | | | `net6.0` |
-   | Between `11.0.0` and `11.5.1` (inclusive) | `net6.0` | | `net6.0` |
-   | Between `11.0.0` and `11.5.1` (inclusive) | `net8.0` | `Disable` | `net6.0` |
    | Between `11.0.0` and `11.5.1` (inclusive) | `net8.0` | `LatestMajor` | `net8.0` |
-   | `11.6` _and_ newer | `net8.0` | | `net8.0` |
+   | Between `11.6.0` and `24.x` | `net8.0` | | `net8.0` |
+   | `25.0` _and_ newer | `net10.0` | | `net10.0` |
 
     Unzip the archive containing extension assemblies to a known location.
 
-    > **Note** If you don't see an asset with a corresponding .NET version, you should always assume that it was compiled for `net6.0`.
+    > **Note** If you don't see an asset with a corresponding .NET version, you should always assume that it was compiled for `net10.0`.
 
 2. **Locate the Universal Orchestrator extensions directory.**
 
@@ -449,10 +455,10 @@ the Keyfactor Command Portal
 
 3. **Create a new directory for the Google Cloud Provider Certificate Manager Universal Orchestrator extension inside the extensions directory.**
 
-    Create a new directory called `Google Cloud Provider Certificate Manager`.
+    Create a new directory called `gcp-certmanager-orchestrator`.
     > The directory name does not need to match any names used elsewhere; it just has to be unique within the extensions directory.
 
-4. **Copy the contents of the downloaded and unzipped assemblies from __step 2__ to the `Google Cloud Provider Certificate Manager` directory.**
+4. **Copy the contents of the downloaded and unzipped assemblies from __step 2__ to the `gcp-certmanager-orchestrator` directory.**
 
 5. **Restart the Universal Orchestrator service.**
 
